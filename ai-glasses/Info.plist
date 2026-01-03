@@ -17,11 +17,10 @@
 	<!-- Meta Wearables DAT configuration -->
 	<key>MWDAT</key>
 	<dict>
-		<!-- TODO: Replace with your Meta App ID from developer.meta.com -->
 		<key>MetaAppID</key>
-		<string>YOUR_META_APP_ID</string>
+		<string>1384258770148195</string>
 		<key>AppLinkURLScheme</key>
-		<string>aiglasses</string>
+		<string>com.kirillmarkin.aiglasses</string>
 		<key>Analytics</key>
 		<dict>
 			<key>OptOut</key>
@@ -35,7 +34,7 @@
 		<dict>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>aiglasses</string>
+				<string>com.kirillmarkin.aiglasses</string>
 			</array>
 		</dict>
 	</array>
