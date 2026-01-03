@@ -212,8 +212,12 @@ final class GlassesManager: ObservableObject {
                 return
             }
             
-            // Use default config: raw video, medium resolution, 30 FPS
-            let config = StreamSessionConfig()
+            // Maximum quality: high resolution (720x1280), 30 FPS
+            let config = StreamSessionConfig(
+                videoCodec: .raw,
+                resolution: .high,
+                frameRate: 30
+            )
             
             streamSession = StreamSession(
                 streamSessionConfig: config,
@@ -264,8 +268,8 @@ final class GlassesManager: ObservableObject {
             return
         }
         
-        // Get video size from current frame
-        var videoSize = CGSize(width: 640, height: 360) // Default low resolution
+        // Get video size from current frame, default to high resolution (720x1280)
+        var videoSize = CGSize(width: 1280, height: 720) // Default high resolution
         if let frame = currentFrame, let image = frame.makeUIImage() {
             videoSize = image.size
         }
@@ -273,7 +277,7 @@ final class GlassesManager: ObservableObject {
         do {
             pendingRecordingURL = try videoRecorder.startRecording(
                 videoSize: videoSize,
-                frameRate: 24
+                frameRate: 30
             )
             recordingState = .recording
             logger.info("🔴 Recording started")
@@ -356,7 +360,12 @@ final class GlassesManager: ObservableObject {
             }
             
             logger.info("📸 Starting temporary stream for photo capture")
-            let config = StreamSessionConfig()
+            // Maximum quality for photo: high resolution (720x1280)
+            let config = StreamSessionConfig(
+                videoCodec: .raw,
+                resolution: .high,
+                frameRate: 30
+            )
             let tempSession = StreamSession(streamSessionConfig: config, deviceSelector: selector)
             
             // Subscribe to photo only
@@ -457,7 +466,12 @@ final class GlassesManager: ObservableObject {
             }
             
             logger.info("📹 Starting temporary stream for video recording")
-            let config = StreamSessionConfig()
+            // Maximum quality for video: high resolution (720x1280), 30 FPS
+            let config = StreamSessionConfig(
+                videoCodec: .raw,
+                resolution: .high,
+                frameRate: 30
+            )
             streamSession = StreamSession(streamSessionConfig: config, deviceSelector: selector)
             
             subscribeToStreamSession()

@@ -66,13 +66,13 @@ final class VideoRecorder {
         // Setup asset writer
         assetWriter = try AVAssetWriter(outputURL: outputURL, fileType: .mp4)
         
-        // Video settings
+        // Video settings - high quality for 720p30
         let videoSettings: [String: Any] = [
             AVVideoCodecKey: AVVideoCodecType.h264,
             AVVideoWidthKey: Int(videoSize.width),
             AVVideoHeightKey: Int(videoSize.height),
             AVVideoCompressionPropertiesKey: [
-                AVVideoAverageBitRateKey: 2_000_000,
+                AVVideoAverageBitRateKey: 6_000_000, // 6 Mbps for high quality 720p
                 AVVideoExpectedSourceFrameRateKey: frameRate,
                 AVVideoProfileLevelKey: AVVideoProfileLevelH264HighAutoLevel
             ]
