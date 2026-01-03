@@ -25,12 +25,15 @@ private enum Log {
 enum MediaItem: Identifiable, Equatable {
     case photo(id: UUID, data: Data, timestamp: Date)
     case video(id: UUID, url: URL, timestamp: Date)
+    case audio(id: UUID, url: URL, timestamp: Date)
     
     var id: UUID {
         switch self {
         case .photo(let id, _, _):
             return id
         case .video(let id, _, _):
+            return id
+        case .audio(let id, _, _):
             return id
         }
     }
@@ -41,11 +44,18 @@ enum MediaItem: Identifiable, Equatable {
             return timestamp
         case .video(_, _, let timestamp):
             return timestamp
+        case .audio(_, _, let timestamp):
+            return timestamp
         }
     }
     
     var isVideo: Bool {
         if case .video = self { return true }
+        return false
+    }
+    
+    var isAudio: Bool {
+        if case .audio = self { return true }
         return false
     }
 }
@@ -57,11 +67,12 @@ private struct StoredMediaItem: Codable {
     let type: MediaType
     let timestamp: Date
     let photoData: Data?
-    let videoPath: String?
+    let filePath: String?
     
     enum MediaType: String, Codable {
         case photo
         case video
+        case audio
     }
     
     init(from mediaItem: MediaItem) {
@@ -71,11 +82,15 @@ private struct StoredMediaItem: Codable {
         case .photo(_, let data, _):
             self.type = .photo
             self.photoData = data
-            self.videoPath = nil
+            self.filePath = nil
         case .video(_, let url, _):
             self.type = .video
             self.photoData = nil
-            self.videoPath = url.path
+            self.filePath = url.path
+        case .audio(_, let url, _):
+            self.type = .audio
+            self.photoData = nil
+            self.filePath = url.path
         }
     }
     
@@ -88,7 +103,7 @@ private struct StoredMediaItem: Codable {
             }
             return .photo(id: id, data: data, timestamp: timestamp)
         case .video:
-            guard let path = videoPath else {
+            guard let path = filePath else {
                 Log.glasses.warning("⚠️ Video path missing for item \(id)")
                 return nil
             }
@@ -98,6 +113,17 @@ private struct StoredMediaItem: Codable {
                 return nil
             }
             return .video(id: id, url: url, timestamp: timestamp)
+        case .audio:
+            guard let path = filePath else {
+                Log.glasses.warning("⚠️ Audio path missing for item \(id)")
+                return nil
+            }
+            let url = URL(fileURLWithPath: path)
+            guard FileManager.default.fileExists(atPath: path) else {
+                Log.glasses.warning("⚠️ Audio file not found: \(path) - user may have deleted it")
+                return nil
+            }
+            return .audio(id: id, url: url, timestamp: timestamp)
         }
     }
 }
@@ -159,6 +185,8 @@ final class GlassesManager: ObservableObject {
     @Published private(set) var isRegistered: Bool = false
     @Published private(set) var recordingState: RecordingState = .idle
     @Published private(set) var isAudioConfigured: Bool = false
+    @Published private(set) var audioRecordingState: AudioRecordingState = .idle
+    @Published private(set) var currentAudioInput: String = "No input"
     
     // MARK: - Private Properties
     
@@ -416,6 +444,68 @@ final class GlassesManager: ObservableObject {
         videoRecorder.cancelRecording()
         recordingState = .idle
         pendingRecordingURL = nil
+    }
+    
+    // MARK: - Audio Recording (Bluetooth HFP - no DAT required)
+    
+    /// Start audio recording from Bluetooth microphone (glasses)
+    /// This uses standard iOS Bluetooth audio, not DAT SDK
+    func startAudioRecording() {
+        guard audioRecordingState == .idle else {
+            Log.glasses.warning("⚠️ Audio recording already in progress")
+            return
+        }
+        
+        do {
+            _ = try audioManager.startRecording()
+            audioRecordingState = .recording
+            currentAudioInput = audioManager.getCurrentInputDescription()
+            Log.glasses.info("🎙️ Audio recording started from: \(self.currentAudioInput)")
+        } catch {
+            Log.glasses.error("❌ Failed to start audio recording: \(error.localizedDescription)")
+            audioRecordingState = .error(error.localizedDescription)
+        }
+    }
+    
+    /// Stop audio recording and save to media library
+    func stopAudioRecording() {
+        guard audioRecordingState == .recording else {
+            Log.glasses.warning("⚠️ No audio recording in progress")
+            return
+        }
+        
+        audioRecordingState = .finishing
+        
+        do {
+            let outputURL = try audioManager.stopRecording()
+            let mediaItem = MediaItem.audio(id: UUID(), url: outputURL, timestamp: Date())
+            capturedMedia.insert(mediaItem, at: 0)
+            saveMediaList()
+            audioRecordingState = .idle
+            Log.glasses.info("✅ Audio recording saved: \(outputURL.lastPathComponent)")
+        } catch {
+            Log.glasses.error("❌ Failed to stop audio recording: \(error.localizedDescription)")
+            audioRecordingState = .error(error.localizedDescription)
+        }
+    }
+    
+    /// Cancel audio recording without saving
+    func cancelAudioRecording() {
+        guard audioRecordingState == .recording else { return }
+        
+        audioManager.cancelRecording()
+        audioRecordingState = .idle
+        Log.glasses.info("🗑️ Audio recording cancelled")
+    }
+    
+    /// Check if Bluetooth microphone (glasses) is available
+    func checkBluetoothAudioAvailable() -> Bool {
+        return audioManager.isBluetoothInputAvailable()
+    }
+    
+    /// Refresh current audio input info
+    func refreshAudioInputInfo() {
+        currentAudioInput = audioManager.getCurrentInputDescription()
     }
     
     func capturePhoto() {

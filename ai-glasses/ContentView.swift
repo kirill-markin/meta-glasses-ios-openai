@@ -56,6 +56,16 @@ struct ContentView: View {
                             onStopRecording: { glassesManager.stopRecording() }
                         )
                         
+                        // Audio Recording (Bluetooth only, no DAT required)
+                        AudioRecordingSection(
+                            audioRecordingState: glassesManager.audioRecordingState,
+                            currentInput: glassesManager.currentAudioInput,
+                            isBluetoothAvailable: glassesManager.checkBluetoothAudioAvailable(),
+                            onStartRecording: { glassesManager.startAudioRecording() },
+                            onStopRecording: { glassesManager.stopAudioRecording() },
+                            onRefreshInput: { glassesManager.refreshAudioInputInfo() }
+                        )
+                        
                         // Media grid
                         if !glassesManager.capturedMedia.isEmpty {
                             MediaGridView(
@@ -345,6 +355,115 @@ private struct ControlsSection: View {
     }
 }
 
+// MARK: - Audio Recording Section
+
+private struct AudioRecordingSection: View {
+    let audioRecordingState: AudioRecordingState
+    let currentInput: String
+    let isBluetoothAvailable: Bool
+    let onStartRecording: () -> Void
+    let onStopRecording: () -> Void
+    let onRefreshInput: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // Section header
+            HStack {
+                Image(systemName: "waveform")
+                    .foregroundColor(.purple)
+                Text("Audio Recording")
+                    .font(.headline)
+                Spacer()
+                
+                // Refresh button
+                Button(action: onRefreshInput) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.caption)
+                }
+                .buttonStyle(.borderless)
+            }
+            
+            // Audio input status
+            HStack(spacing: 8) {
+                Image(systemName: isBluetoothAvailable ? "antenna.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right.slash")
+                    .foregroundColor(isBluetoothAvailable ? .green : .orange)
+                
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(isBluetoothAvailable ? "Bluetooth Available" : "No Bluetooth Audio")
+                        .font(.caption)
+                        .foregroundColor(isBluetoothAvailable ? .green : .orange)
+                    Text(currentInput)
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Color(.tertiarySystemBackground))
+            .cornerRadius(8)
+            
+            // Recording indicator
+            if audioRecordingState == .recording {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(Color.red)
+                        .frame(width: 10, height: 10)
+                    Text("Recording audio...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+            }
+            
+            // Record button
+            if audioRecordingState == .recording {
+                Button(action: onStopRecording) {
+                    Label("Stop Audio Recording", systemImage: "stop.circle.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
+            } else {
+                Button(action: onStartRecording) {
+                    Label("Record Audio", systemImage: "mic.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.purple)
+                .disabled(audioRecordingState == .finishing)
+            }
+            
+            // Finishing indicator
+            if audioRecordingState == .finishing {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                    Text("Saving audio...")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            // Error message
+            if case .error(let message) = audioRecordingState {
+                Text(message)
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
+            
+            // Info text
+            Text("Records from Bluetooth microphone (glasses). No DAT stream required.")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+        .cornerRadius(12)
+    }
+}
+
 // MARK: - Media Grid View
 
 private struct MediaGridView: View {
@@ -404,6 +523,22 @@ private struct MediaThumbnailView: View {
                             .font(.title)
                             .foregroundColor(.white)
                             .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                    )
+                
+            case .audio(_, _, _):
+                Rectangle()
+                    .fill(Color.purple.opacity(0.3))
+                    .aspectRatio(1, contentMode: .fit)
+                    .cornerRadius(8)
+                    .overlay(
+                        VStack(spacing: 4) {
+                            Image(systemName: "waveform")
+                                .font(.title)
+                                .foregroundColor(.purple)
+                            Image(systemName: "play.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.white)
+                        }
                     )
             }
         }
@@ -474,6 +609,9 @@ private struct MediaDetailView: View {
                     
                 case .video(_, let url, _):
                     VideoDetailContent(url: url)
+                    
+                case .audio(_, let url, _):
+                    AudioDetailContent(url: url)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -504,6 +642,8 @@ private struct MediaDetailView: View {
         case .photo(_, let data, _):
             return data
         case .video(_, let url, _):
+            return url
+        case .audio(_, let url, _):
             return url
         }
     }
@@ -582,6 +722,144 @@ private struct VideoDetailContent: View {
             player?.pause()
             player = nil
         }
+    }
+}
+
+// MARK: - Audio Detail Content
+
+private struct AudioDetailContent: View {
+    let url: URL
+    @State private var player: AVPlayer?
+    @State private var isPlaying: Bool = false
+    @State private var duration: Double = 0
+    @State private var currentTime: Double = 0
+    @State private var timeObserver: Any?
+    
+    var body: some View {
+        VStack(spacing: 32) {
+            Spacer()
+            
+            // Waveform icon
+            Image(systemName: "waveform")
+                .font(.system(size: 80))
+                .foregroundColor(.purple)
+            
+            // File name
+            Text(url.lastPathComponent)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            
+            // Progress bar
+            VStack(spacing: 8) {
+                ProgressView(value: duration > 0 ? currentTime / duration : 0)
+                    .progressViewStyle(.linear)
+                    .tint(.purple)
+                
+                HStack {
+                    Text(formatTime(currentTime))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text(formatTime(duration))
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding(.horizontal, 40)
+            
+            // Playback controls
+            HStack(spacing: 40) {
+                // Rewind 15s
+                Button(action: { seek(by: -15) }) {
+                    Image(systemName: "gobackward.15")
+                        .font(.title)
+                        .foregroundColor(.white)
+                }
+                
+                // Play/Pause
+                Button(action: togglePlayback) {
+                    Image(systemName: isPlaying ? "pause.circle.fill" : "play.circle.fill")
+                        .font(.system(size: 64))
+                        .foregroundColor(.purple)
+                }
+                
+                // Forward 15s
+                Button(action: { seek(by: 15) }) {
+                    Image(systemName: "goforward.15")
+                        .font(.title)
+                        .foregroundColor(.white)
+                }
+            }
+            
+            Spacer()
+        }
+        .onAppear {
+            setupPlayer()
+        }
+        .onDisappear {
+            cleanupPlayer()
+        }
+    }
+    
+    private func setupPlayer() {
+        let playerItem = AVPlayerItem(url: url)
+        player = AVPlayer(playerItem: playerItem)
+        
+        // Get duration
+        Task {
+            if let duration = try? await playerItem.asset.load(.duration) {
+                await MainActor.run {
+                    self.duration = CMTimeGetSeconds(duration)
+                }
+            }
+        }
+        
+        // Add time observer
+        let interval = CMTime(seconds: 0.1, preferredTimescale: CMTimeScale(NSEC_PER_SEC))
+        timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
+            currentTime = CMTimeGetSeconds(time)
+        }
+        
+        // Observe playback end
+        NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: playerItem,
+            queue: .main
+        ) { _ in
+            isPlaying = false
+            player?.seek(to: .zero)
+        }
+    }
+    
+    private func cleanupPlayer() {
+        player?.pause()
+        if let observer = timeObserver {
+            player?.removeTimeObserver(observer)
+        }
+        player = nil
+    }
+    
+    private func togglePlayback() {
+        if isPlaying {
+            player?.pause()
+        } else {
+            player?.play()
+        }
+        isPlaying.toggle()
+    }
+    
+    private func seek(by seconds: Double) {
+        guard let player = player else { return }
+        let current = CMTimeGetSeconds(player.currentTime())
+        let newTime = max(0, min(duration, current + seconds))
+        player.seek(to: CMTime(seconds: newTime, preferredTimescale: CMTimeScale(NSEC_PER_SEC)))
+    }
+    
+    private func formatTime(_ time: Double) -> String {
+        guard time.isFinite else { return "0:00" }
+        let minutes = Int(time) / 60
+        let seconds = Int(time) % 60
+        return String(format: "%d:%02d", minutes, seconds)
     }
 }
 
