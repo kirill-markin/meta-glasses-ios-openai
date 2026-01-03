@@ -18,48 +18,51 @@ struct ContentView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    // Status section
-                    StatusSection(
-                        state: glassesManager.connectionState,
-                        isRegistered: glassesManager.isRegistered,
-                        deviceCount: glassesManager.availableDevices.count
-                    )
-                    
                     // Registration section (if not registered)
                     if !glassesManager.isRegistered {
                         RegistrationSection(onRegister: { glassesManager.register() })
                     }
                     
-                    // Video preview
-                    VideoPreviewSection(
-                        frame: glassesManager.currentFrame,
-                        isStreaming: glassesManager.connectionState == .streaming,
-                        isRecording: glassesManager.recordingState == .recording
-                    )
-                    
-                    // Controls
-                    ControlsSection(
-                        state: glassesManager.connectionState,
-                        isRegistered: glassesManager.isRegistered,
-                        recordingState: glassesManager.recordingState,
-                        isAudioConfigured: glassesManager.isAudioConfigured,
-                        onConnect: { glassesManager.startSearching() },
-                        onDisconnect: { glassesManager.disconnect() },
-                        onStartStream: { glassesManager.startStreaming() },
-                        onStopStream: { glassesManager.stopStreaming() },
-                        onCapturePhoto: { glassesManager.capturePhoto() },
-                        onStartQuickVideo: { glassesManager.startQuickVideoRecording() },
-                        onStopQuickVideo: { glassesManager.stopQuickVideoRecording() },
-                        onStartRecording: { glassesManager.startRecording() },
-                        onStopRecording: { glassesManager.stopRecording() }
-                    )
-                    
-                    // Media grid
-                    if !glassesManager.capturedMedia.isEmpty {
-                        MediaGridView(
-                            media: glassesManager.capturedMedia,
-                            selectedItem: $selectedMediaItem
+                    // Show main UI only after registration
+                    if glassesManager.isRegistered {
+                        // Status section
+                        StatusSection(
+                            state: glassesManager.connectionState,
+                            isRegistered: glassesManager.isRegistered,
+                            deviceCount: glassesManager.availableDevices.count
                         )
+                        
+                        // Video preview
+                        VideoPreviewSection(
+                            frame: glassesManager.currentFrame,
+                            isStreaming: glassesManager.connectionState == .streaming,
+                            isRecording: glassesManager.recordingState == .recording
+                        )
+                        
+                        // Controls
+                        ControlsSection(
+                            state: glassesManager.connectionState,
+                            isRegistered: glassesManager.isRegistered,
+                            recordingState: glassesManager.recordingState,
+                            isAudioConfigured: glassesManager.isAudioConfigured,
+                            onConnect: { glassesManager.startSearching() },
+                            onDisconnect: { glassesManager.disconnect() },
+                            onStartStream: { glassesManager.startStreaming() },
+                            onStopStream: { glassesManager.stopStreaming() },
+                            onCapturePhoto: { glassesManager.capturePhoto() },
+                            onStartQuickVideo: { glassesManager.startQuickVideoRecording() },
+                            onStopQuickVideo: { glassesManager.stopQuickVideoRecording() },
+                            onStartRecording: { glassesManager.startRecording() },
+                            onStopRecording: { glassesManager.stopRecording() }
+                        )
+                        
+                        // Media grid
+                        if !glassesManager.capturedMedia.isEmpty {
+                            MediaGridView(
+                                media: glassesManager.capturedMedia,
+                                selectedItem: $selectedMediaItem
+                            )
+                        }
                     }
                 }
                 .padding()
