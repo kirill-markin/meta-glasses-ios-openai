@@ -161,14 +161,13 @@ private struct VideoPreviewSection: View {
     
     var body: some View {
         ZStack {
+            // Fixed 16:9 horizontal container
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color.black)
-                .aspectRatio(16/9, contentMode: .fit)
             
             if isStreaming {
                 if let frame = frame {
                     VideoFrameView(frame: frame)
-                        .cornerRadius(16)
                 } else {
                     ProgressView()
                         .tint(.white)
@@ -207,6 +206,8 @@ private struct VideoPreviewSection: View {
                 }
             }
         }
+        .aspectRatio(16/9, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 }
 
