@@ -44,6 +44,8 @@ struct ContentView: View {
                     onStartStream: { glassesManager.startStreaming() },
                     onStopStream: { glassesManager.stopStreaming() },
                     onCapturePhoto: { glassesManager.capturePhoto() },
+                    onStartQuickVideo: { glassesManager.startQuickVideoRecording() },
+                    onStopQuickVideo: { glassesManager.stopQuickVideoRecording() },
                     onStartRecording: { glassesManager.startRecording() },
                     onStopRecording: { glassesManager.stopRecording() }
                 )
@@ -231,6 +233,8 @@ private struct ControlsSection: View {
     let onStartStream: () -> Void
     let onStopStream: () -> Void
     let onCapturePhoto: () -> Void
+    let onStartQuickVideo: () -> Void
+    let onStopQuickVideo: () -> Void
     let onStartRecording: () -> Void
     let onStopRecording: () -> Void
     
@@ -283,6 +287,7 @@ private struct ControlsSection: View {
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
+                        .disabled(recordingState == .recording)
                     }
                     
                     Button(action: onCapturePhoto) {
@@ -292,44 +297,41 @@ private struct ControlsSection: View {
                     .buttonStyle(.borderedProminent)
                     .tint(.green)
                     .disabled(recordingState == .recording)
+                    
+                    // Quick Video button (works like Photo - starts stream if needed)
+                    if recordingState == .recording {
+                        Button(action: onStopQuickVideo) {
+                            Label("Stop", systemImage: "stop.circle.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                    } else {
+                        Button(action: onStartQuickVideo) {
+                            Label("Video", systemImage: "video.circle.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                        .disabled(recordingState == .finishing)
+                    }
                 }
                 
-                // Recording controls (only when streaming)
-                if state == .streaming {
-                    HStack(spacing: 16) {
-                        if recordingState == .recording {
-                            Button(action: onStopRecording) {
-                                Label("Stop Recording", systemImage: "stop.circle.fill")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .tint(.red)
-                        } else {
-                            Button(action: onStartRecording) {
-                                Label("Record Video", systemImage: "record.circle")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(.red)
-                            .disabled(recordingState == .finishing)
-                        }
-                    }
-                    
-                    if recordingState == .finishing {
-                        HStack(spacing: 8) {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                            Text("Saving video...")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    
-                    if case .error(let message) = recordingState {
-                        Text(message)
+                // Finishing indicator
+                if recordingState == .finishing {
+                    HStack(spacing: 8) {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                        Text("Saving video...")
                             .font(.caption)
-                            .foregroundColor(.red)
+                            .foregroundColor(.secondary)
                     }
+                }
+                
+                if case .error(let message) = recordingState {
+                    Text(message)
+                        .font(.caption)
+                        .foregroundColor(.red)
                 }
             }
         }

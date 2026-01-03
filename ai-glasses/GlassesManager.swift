@@ -87,6 +87,9 @@ final class GlassesManager: ObservableObject {
     private let videoRecorder = VideoRecorder()
     private var pendingRecordingURL: URL?
     
+    // Quick video mode - started stream just for video capture
+    private var isQuickVideoMode: Bool = false
+    
     // Listener tokens - must be retained to keep subscriptions active
     private var devicesListenerToken: AnyListenerToken?
     private var videoFrameListenerToken: AnyListenerToken?
@@ -381,6 +384,104 @@ final class GlassesManager: ObservableObject {
         }
     }
     
+    // MARK: - Quick Video Recording (with temporary stream)
+    
+    /// Start video recording - will start stream if not already streaming
+    func startQuickVideoRecording() {
+        if connectionState == .streaming {
+            // Already streaming - just start recording
+            startRecording()
+        } else {
+            // Need to start stream first
+            startVideoWithTemporaryStream()
+        }
+    }
+    
+    /// Stop video recording - will stop stream if we started it for this recording
+    func stopQuickVideoRecording() {
+        guard recordingState == .recording else {
+            logger.warning("⚠️ No recording in progress")
+            return
+        }
+        
+        Task {
+            await stopRecordingInternal()
+            
+            // If we started stream just for this video, stop it
+            if isQuickVideoMode {
+                isQuickVideoMode = false
+                logger.info("📹 Quick video mode - stopping temporary stream")
+                stopStreaming()
+            }
+        }
+    }
+    
+    private func startVideoWithTemporaryStream() {
+        guard let selector = deviceSelector else {
+            logger.error("❌ No device selector for video capture")
+            connectionState = .error("Connect to glasses first")
+            return
+        }
+        
+        isQuickVideoMode = true
+        
+        Task {
+            // Check camera permission
+            do {
+                let cameraStatus = try await wearables.checkPermissionStatus(.camera)
+                if cameraStatus != .granted {
+                    logger.info("📷 Requesting camera permission for video...")
+                    let newStatus = try await wearables.requestPermission(.camera)
+                    if newStatus != .granted {
+                        logger.error("❌ Camera permission denied")
+                        connectionState = .error("Camera permission denied")
+                        isQuickVideoMode = false
+                        return
+                    }
+                }
+            } catch {
+                logger.error("❌ Camera permission error: \(error.localizedDescription)")
+                isQuickVideoMode = false
+                return
+            }
+            
+            // Configure audio BEFORE starting stream
+            do {
+                try audioManager.configureForHFP()
+                isAudioConfigured = true
+                try await Task.sleep(nanoseconds: 2 * NSEC_PER_SEC)
+                logger.info("🎤 Audio configured for quick video")
+            } catch {
+                logger.warning("⚠️ Audio configuration failed: \(error.localizedDescription)")
+                isAudioConfigured = false
+            }
+            
+            logger.info("📹 Starting temporary stream for video recording")
+            let config = StreamSessionConfig()
+            streamSession = StreamSession(streamSessionConfig: config, deviceSelector: selector)
+            
+            subscribeToStreamSession()
+            await streamSession?.start()
+            
+            // Wait for streaming state before starting recording
+            // Poll for streaming state with timeout
+            var attempts = 0
+            while connectionState != .streaming && attempts < 20 {
+                try? await Task.sleep(nanoseconds: 250_000_000) // 0.25 sec
+                attempts += 1
+            }
+            
+            if connectionState == .streaming {
+                // Small extra delay to ensure stable stream
+                try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 sec
+                startRecording()
+            } else {
+                logger.error("❌ Failed to start streaming for video")
+                isQuickVideoMode = false
+            }
+        }
+    }
+    
     func disconnect() {
         logger.info("🔌 Disconnecting...")
         Task {
@@ -399,6 +500,7 @@ final class GlassesManager: ObservableObject {
             audioManager.deactivate()
             isAudioConfigured = false
             
+            isQuickVideoMode = false
             deviceSelector = nil
             connectionState = .disconnected
             logger.info("✅ Disconnected")
