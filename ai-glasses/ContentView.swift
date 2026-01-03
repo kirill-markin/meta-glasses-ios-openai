@@ -275,10 +275,10 @@ private struct ControlsSection: View {
             
             // Streaming controls
             if state.isConnected {
-                HStack(spacing: 16) {
+                VStack(spacing: 12) {
                     if state == .streaming {
                         Button(action: onStopStream) {
-                            Label("Stop", systemImage: "stop.fill")
+                            Label("Stop Stream", systemImage: "stop.fill")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
@@ -286,7 +286,7 @@ private struct ControlsSection: View {
                         .disabled(recordingState == .recording)
                     } else {
                         Button(action: onStartStream) {
-                            Label("Stream", systemImage: "video.fill")
+                            Label("Start Stream", systemImage: "video.fill")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
@@ -294,7 +294,7 @@ private struct ControlsSection: View {
                     }
                     
                     Button(action: onCapturePhoto) {
-                        Label("Photo", systemImage: "camera.fill")
+                        Label("Capture Photo", systemImage: "camera.fill")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
@@ -304,14 +304,14 @@ private struct ControlsSection: View {
                     // Quick Video button (works like Photo - starts stream if needed)
                     if recordingState == .recording {
                         Button(action: onStopQuickVideo) {
-                            Label("Stop", systemImage: "stop.circle.fill")
+                            Label("Stop Recording", systemImage: "stop.circle.fill")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(.red)
                     } else {
                         Button(action: onStartQuickVideo) {
-                            Label("Video", systemImage: "video.circle.fill")
+                            Label("Record Video", systemImage: "video.circle.fill")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
