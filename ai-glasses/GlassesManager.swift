@@ -269,8 +269,8 @@ final class GlassesManager: ObservableObject {
             return
         }
         
-        // Get video size from current frame, default to high resolution (720x1280)
-        var videoSize = CGSize(width: 1280, height: 720) // Default high resolution
+        // Get video size from current frame, default to high resolution (720x1280 portrait)
+        var videoSize = CGSize(width: 720, height: 1280) // Default high resolution (portrait)
         if let frame = currentFrame, let image = frame.makeUIImage() {
             videoSize = image.size
         }
