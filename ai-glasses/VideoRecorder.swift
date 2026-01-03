@@ -24,7 +24,8 @@ enum RecordingState: Equatable {
 // MARK: - Video Recorder
 
 /// Records video frames and audio to a file
-final class VideoRecorder {
+/// Marked as @unchecked Sendable because it handles synchronization internally via recordingQueue
+final class VideoRecorder: @unchecked Sendable {
     
     // MARK: - Properties
     

@@ -16,7 +16,9 @@ import os.log
 
 // MARK: - Logging
 
-private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "ai-glasses", category: "GlassesManager")
+private enum Log {
+    nonisolated static let glasses = Logger(subsystem: Bundle.main.bundleIdentifier ?? "ai-glasses", category: "GlassesManager")
+}
 
 // MARK: - Media Item
 
@@ -81,18 +83,18 @@ private struct StoredMediaItem: Codable {
         switch type {
         case .photo:
             guard let data = photoData else {
-                logger.warning("⚠️ Photo data missing for item \(id)")
+                Log.glasses.warning("⚠️ Photo data missing for item \(id)")
                 return nil
             }
             return .photo(id: id, data: data, timestamp: timestamp)
         case .video:
             guard let path = videoPath else {
-                logger.warning("⚠️ Video path missing for item \(id)")
+                Log.glasses.warning("⚠️ Video path missing for item \(id)")
                 return nil
             }
             let url = URL(fileURLWithPath: path)
             guard FileManager.default.fileExists(atPath: path) else {
-                logger.warning("⚠️ Video file not found: \(path) - user may have deleted it")
+                Log.glasses.warning("⚠️ Video file not found: \(path) - user may have deleted it")
                 return nil
             }
             return .video(id: id, url: url, timestamp: timestamp)
@@ -147,7 +149,7 @@ final class GlassesManager: ObservableObject {
     @Published private(set) var connectionState: GlassesConnectionState = .disconnected {
         didSet {
             if oldValue != connectionState {
-                logger.info("🔄 State changed: \(oldValue.displayText) → \(self.connectionState.displayText)")
+                Log.glasses.info("🔄 State changed: \(oldValue.displayText) → \(self.connectionState.displayText)")
             }
         }
     }
@@ -188,7 +190,7 @@ final class GlassesManager: ObservableObject {
     // MARK: - Initialization
     
     init() {
-        logger.info("📱 GlassesManager initialized")
+        Log.glasses.info("📱 GlassesManager initialized")
         self.wearables = Wearables.shared
         loadMediaList()
         setupDevicesListener()
@@ -199,7 +201,7 @@ final class GlassesManager: ObservableObject {
     
     func register() {
         if isRegistered {
-            logger.info("📝 Already registered, skipping")
+            Log.glasses.info("📝 Already registered, skipping")
             return
         }
         
@@ -207,7 +209,7 @@ final class GlassesManager: ObservableObject {
             // Check current registration state from stream before attempting
             for await state in wearables.registrationStateStream() {
                 if case .registered = state {
-                    logger.info("📝 Already registered (confirmed from stream), skipping")
+                    Log.glasses.info("📝 Already registered (confirmed from stream), skipping")
                     await MainActor.run { self.isRegistered = true }
                     return
                 }
@@ -215,35 +217,35 @@ final class GlassesManager: ObservableObject {
                 break
             }
             
-            logger.info("📝 Starting registration with Meta AI app...")
+            Log.glasses.info("📝 Starting registration with Meta AI app...")
             do {
                 try wearables.startRegistration()
-                logger.info("✅ Registration started - check Meta AI app")
+                Log.glasses.info("✅ Registration started - check Meta AI app")
             } catch {
-                logger.warning("⚠️ Registration request failed: \(error.localizedDescription)")
+                Log.glasses.warning("⚠️ Registration request failed: \(error.localizedDescription)")
             }
         }
     }
     
     func unregister() {
-        logger.info("📝 Starting unregistration...")
+        Log.glasses.info("📝 Starting unregistration...")
         do {
             try wearables.startUnregistration()
-            logger.info("✅ Unregistration started")
+            Log.glasses.info("✅ Unregistration started")
         } catch {
-            logger.error("❌ Unregistration failed: \(error.localizedDescription)")
+            Log.glasses.error("❌ Unregistration failed: \(error.localizedDescription)")
         }
     }
     
     func startSearching() {
-        logger.info("🔍 Starting device search")
+        Log.glasses.info("🔍 Starting device search")
         connectionState = .searching
         deviceSelector = AutoDeviceSelector(wearables: wearables)
         
         Task {
             for await device in deviceSelector!.activeDeviceStream() {
                 if let device = device {
-                    logger.info("✅ Device found: \(String(describing: device))")
+                    Log.glasses.info("✅ Device found: \(String(describing: device))")
                     connectionState = .connected
                     break
                 }
@@ -252,15 +254,15 @@ final class GlassesManager: ObservableObject {
     }
     
     func stopSearching() {
-        logger.info("⏹️ Stopping device search")
+        Log.glasses.info("⏹️ Stopping device search")
         deviceSelector = nil
         connectionState = .disconnected
     }
     
     func startStreaming() {
-        logger.info("🎬 Starting streaming...")
+        Log.glasses.info("🎬 Starting streaming...")
         guard let selector = deviceSelector else {
-            logger.error("❌ No device selector available")
+            Log.glasses.error("❌ No device selector available")
             connectionState = .error("No device selector available")
             return
         }
@@ -273,9 +275,9 @@ final class GlassesManager: ObservableObject {
                 
                 // Wait for HFP to be ready (as per Meta docs)
                 try await Task.sleep(nanoseconds: 2 * NSEC_PER_SEC)
-                logger.info("🎤 Audio configured, HFP ready")
+                Log.glasses.info("🎤 Audio configured, HFP ready")
             } catch {
-                logger.warning("⚠️ Audio configuration failed: \(error.localizedDescription)")
+                Log.glasses.warning("⚠️ Audio configuration failed: \(error.localizedDescription)")
                 isAudioConfigured = false
                 // Continue without audio - video streaming still works
             }
@@ -285,18 +287,18 @@ final class GlassesManager: ObservableObject {
                 let cameraStatus = try await wearables.checkPermissionStatus(.camera)
                 
                 if cameraStatus != .granted {
-                    logger.info("📷 Requesting camera permission...")
+                    Log.glasses.info("📷 Requesting camera permission...")
                     let newStatus = try await wearables.requestPermission(.camera)
                     
                     if newStatus != .granted {
-                        logger.error("❌ Camera permission denied")
+                        Log.glasses.error("❌ Camera permission denied")
                         connectionState = .error("Camera permission denied")
                         return
                     }
-                    logger.info("📷 Camera permission granted")
+                    Log.glasses.info("📷 Camera permission granted")
                 }
             } catch {
-                logger.error("❌ Camera permission error: \(error.localizedDescription)")
+                Log.glasses.error("❌ Camera permission error: \(error.localizedDescription)")
                 connectionState = .error("Camera permission error: \(error.localizedDescription)")
                 return
             }
@@ -319,7 +321,7 @@ final class GlassesManager: ObservableObject {
     }
     
     func stopStreaming() {
-        logger.info("⏹️ Stopping streaming")
+        Log.glasses.info("⏹️ Stopping streaming")
         Task {
             // Stop recording if in progress
             if recordingState == .recording {
@@ -347,13 +349,13 @@ final class GlassesManager: ObservableObject {
     
     func startRecording() {
         guard connectionState == .streaming else {
-            logger.warning("⚠️ Must be streaming to record")
+            Log.glasses.warning("⚠️ Must be streaming to record")
             recordingState = .error("Must be streaming to record")
             return
         }
         
         guard recordingState == .idle else {
-            logger.warning("⚠️ Recording already in progress")
+            Log.glasses.warning("⚠️ Recording already in progress")
             return
         }
         
@@ -369,16 +371,16 @@ final class GlassesManager: ObservableObject {
                 frameRate: 30
             )
             recordingState = .recording
-            logger.info("🔴 Recording started")
+            Log.glasses.info("🔴 Recording started")
         } catch {
-            logger.error("❌ Failed to start recording: \(error.localizedDescription)")
+            Log.glasses.error("❌ Failed to start recording: \(error.localizedDescription)")
             recordingState = .error(error.localizedDescription)
         }
     }
     
     func stopRecording() {
         guard recordingState == .recording else {
-            logger.warning("⚠️ No recording in progress")
+            Log.glasses.warning("⚠️ No recording in progress")
             return
         }
         
@@ -399,12 +401,12 @@ final class GlassesManager: ObservableObject {
                 self.saveMediaList()
                 self.recordingState = .idle
             }
-            logger.info("✅ Recording saved: \(outputURL.lastPathComponent)")
+            Log.glasses.info("✅ Recording saved: \(outputURL.lastPathComponent)")
         } catch {
             await MainActor.run {
                 self.recordingState = .error(error.localizedDescription)
             }
-            logger.error("❌ Failed to stop recording: \(error.localizedDescription)")
+            Log.glasses.error("❌ Failed to stop recording: \(error.localizedDescription)")
         }
     }
     
@@ -417,7 +419,7 @@ final class GlassesManager: ObservableObject {
     }
     
     func capturePhoto() {
-        logger.info("📸 Capturing photo...")
+        Log.glasses.info("📸 Capturing photo...")
         if streamSession != nil {
             streamSession?.capturePhoto(format: .jpeg)
         } else {
@@ -428,7 +430,7 @@ final class GlassesManager: ObservableObject {
     
     private func capturePhotoWithTemporaryStream() {
         guard let selector = deviceSelector else {
-            logger.error("❌ No device selector for photo capture")
+            Log.glasses.error("❌ No device selector for photo capture")
             connectionState = .error("Connect to glasses first")
             return
         }
@@ -438,20 +440,20 @@ final class GlassesManager: ObservableObject {
             do {
                 let cameraStatus = try await wearables.checkPermissionStatus(.camera)
                 if cameraStatus != .granted {
-                    logger.info("📷 Requesting camera permission for photo...")
+                    Log.glasses.info("📷 Requesting camera permission for photo...")
                     let newStatus = try await wearables.requestPermission(.camera)
                     if newStatus != .granted {
-                        logger.error("❌ Camera permission denied")
+                        Log.glasses.error("❌ Camera permission denied")
                         connectionState = .error("Camera permission denied")
                         return
                     }
                 }
             } catch {
-                logger.error("❌ Camera permission error: \(error.localizedDescription)")
+                Log.glasses.error("❌ Camera permission error: \(error.localizedDescription)")
                 return
             }
             
-            logger.info("📸 Starting temporary stream for photo capture")
+            Log.glasses.info("📸 Starting temporary stream for photo capture")
             // Maximum quality for photo: high resolution (720x1280)
             let config = StreamSessionConfig(
                 videoCodec: .raw,
@@ -463,7 +465,7 @@ final class GlassesManager: ObservableObject {
             // Subscribe to photo only
             let photoToken = tempSession.photoDataPublisher.listen { [weak self] (photoData: PhotoData) in
                 guard let self else { return }
-                logger.info("📸 Photo received: \(photoData.data.count) bytes")
+                Log.glasses.info("📸 Photo received: \(photoData.data.count) bytes")
                 self.savePhotoToLibrary(imageData: photoData.data)
                 Task { @MainActor in
                     let mediaItem = MediaItem.photo(id: UUID(), data: photoData.data, timestamp: Date())
@@ -484,7 +486,7 @@ final class GlassesManager: ObservableObject {
             
             await tempSession.stop()
             await photoToken.cancel()
-            logger.info("📸 Temporary stream stopped")
+            Log.glasses.info("📸 Temporary stream stopped")
         }
     }
     
@@ -504,7 +506,7 @@ final class GlassesManager: ObservableObject {
     /// Stop video recording - will stop stream if we started it for this recording
     func stopQuickVideoRecording() {
         guard recordingState == .recording else {
-            logger.warning("⚠️ No recording in progress")
+            Log.glasses.warning("⚠️ No recording in progress")
             return
         }
         
@@ -514,7 +516,7 @@ final class GlassesManager: ObservableObject {
             // If we started stream just for this video, stop it
             if isQuickVideoMode {
                 isQuickVideoMode = false
-                logger.info("📹 Quick video mode - stopping temporary stream")
+                Log.glasses.info("📹 Quick video mode - stopping temporary stream")
                 stopStreaming()
             }
         }
@@ -522,7 +524,7 @@ final class GlassesManager: ObservableObject {
     
     private func startVideoWithTemporaryStream() {
         guard let selector = deviceSelector else {
-            logger.error("❌ No device selector for video capture")
+            Log.glasses.error("❌ No device selector for video capture")
             connectionState = .error("Connect to glasses first")
             return
         }
@@ -534,17 +536,17 @@ final class GlassesManager: ObservableObject {
             do {
                 let cameraStatus = try await wearables.checkPermissionStatus(.camera)
                 if cameraStatus != .granted {
-                    logger.info("📷 Requesting camera permission for video...")
+                    Log.glasses.info("📷 Requesting camera permission for video...")
                     let newStatus = try await wearables.requestPermission(.camera)
                     if newStatus != .granted {
-                        logger.error("❌ Camera permission denied")
+                        Log.glasses.error("❌ Camera permission denied")
                         connectionState = .error("Camera permission denied")
                         isQuickVideoMode = false
                         return
                     }
                 }
             } catch {
-                logger.error("❌ Camera permission error: \(error.localizedDescription)")
+                Log.glasses.error("❌ Camera permission error: \(error.localizedDescription)")
                 isQuickVideoMode = false
                 return
             }
@@ -554,13 +556,13 @@ final class GlassesManager: ObservableObject {
                 try audioManager.configureForHFP()
                 isAudioConfigured = true
                 try await Task.sleep(nanoseconds: 2 * NSEC_PER_SEC)
-                logger.info("🎤 Audio configured for quick video")
+                Log.glasses.info("🎤 Audio configured for quick video")
             } catch {
-                logger.warning("⚠️ Audio configuration failed: \(error.localizedDescription)")
+                Log.glasses.warning("⚠️ Audio configuration failed: \(error.localizedDescription)")
                 isAudioConfigured = false
             }
             
-            logger.info("📹 Starting temporary stream for video recording")
+            Log.glasses.info("📹 Starting temporary stream for video recording")
             // Maximum quality for video: high resolution (720x1280), 30 FPS
             let config = StreamSessionConfig(
                 videoCodec: .raw,
@@ -585,14 +587,14 @@ final class GlassesManager: ObservableObject {
                 try? await Task.sleep(nanoseconds: 500_000_000) // 0.5 sec
                 startRecording()
             } else {
-                logger.error("❌ Failed to start streaming for video")
+                Log.glasses.error("❌ Failed to start streaming for video")
                 isQuickVideoMode = false
             }
         }
     }
     
     func disconnect() {
-        logger.info("🔌 Disconnecting...")
+        Log.glasses.info("🔌 Disconnecting...")
         Task {
             // Cancel any recording in progress
             if recordingState == .recording {
@@ -612,7 +614,7 @@ final class GlassesManager: ObservableObject {
             isQuickVideoMode = false
             deviceSelector = nil
             connectionState = .disconnected
-            logger.info("✅ Disconnected")
+            Log.glasses.info("✅ Disconnected")
         }
     }
     
@@ -623,7 +625,7 @@ final class GlassesManager: ObservableObject {
             guard let self else { return }
             Task { @MainActor in
                 if devices.count != self.availableDevices.count {
-                    logger.info("📱 Devices: \(devices.count) available")
+                    Log.glasses.info("📱 Devices: \(devices.count) available")
                 }
                 self.availableDevices = devices
             }
@@ -639,12 +641,12 @@ final class GlassesManager: ObservableObject {
                     if case .registered = state {
                         self.isRegistered = true
                         if !wasRegistered {
-                            logger.info("✅ App is registered with Meta AI")
+                            Log.glasses.info("✅ App is registered with Meta AI")
                         }
                     } else {
                         self.isRegistered = false
                         if wasRegistered {
-                            logger.info("⚪ App unregistered: \(String(describing: state))")
+                            Log.glasses.info("⚪ App unregistered: \(String(describing: state))")
                         }
                     }
                 }
@@ -652,29 +654,32 @@ final class GlassesManager: ObservableObject {
         }
     }
     
+    // Track frame count for logging (not every frame) - must be actor-isolated
+    private var streamFrameCount: Int = 0
+    
     private func subscribeToStreamSession() {
         guard let session = streamSession else { return }
         
-        // Track frame count for logging (not every frame)
-        var frameCount = 0
+        // Reset frame count for new stream session
+        streamFrameCount = 0
         
         // Subscribe to video frames
         videoFrameListenerToken = session.videoFramePublisher.listen { [weak self] (frame: VideoFrame) in
-            guard let self else { return }
-            frameCount += 1
-            // Log every 100th frame to avoid spam
-            if frameCount == 1 || frameCount % 100 == 0 {
-                logger.debug("🎞️ Frame #\(frameCount) received")
-            }
-            
-            // Append frame to video recorder if recording
-            if self.videoRecorder.recordingInProgress {
-                if let image = frame.makeUIImage() {
-                    self.videoRecorder.appendFrame(image: image)
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                
+                // Append frame to video recorder if recording
+                if self.videoRecorder.recordingInProgress {
+                    if let image = frame.makeUIImage() {
+                        self.videoRecorder.appendFrame(image: image)
+                    }
                 }
-            }
-            
-            Task { @MainActor in
+                
+                self.streamFrameCount += 1
+                // Log every 100th frame to avoid spam
+                if self.streamFrameCount == 1 || self.streamFrameCount % 100 == 0 {
+                    Log.glasses.debug("🎞️ Frame #\(self.streamFrameCount) received")
+                }
                 self.currentFrame = frame
             }
         }
@@ -682,7 +687,7 @@ final class GlassesManager: ObservableObject {
         // Subscribe to photos
         photoListenerToken = session.photoDataPublisher.listen { [weak self] (photoData: PhotoData) in
             guard let self else { return }
-            logger.info("📸 Photo received: \(photoData.data.count) bytes")
+            Log.glasses.info("📸 Photo received: \(photoData.data.count) bytes")
             self.savePhotoToLibrary(imageData: photoData.data)
             Task { @MainActor in
                 let mediaItem = MediaItem.photo(id: UUID(), data: photoData.data, timestamp: Date())
@@ -694,7 +699,7 @@ final class GlassesManager: ObservableObject {
         // Subscribe to errors
         errorListenerToken = session.errorPublisher.listen { [weak self] (error: StreamSessionError) in
             guard let self else { return }
-            logger.error("❌ Stream error: \(error.localizedDescription)")
+            Log.glasses.error("❌ Stream error: \(error.localizedDescription)")
             Task { @MainActor in
                 self.connectionState = .error(error.localizedDescription)
             }
@@ -732,7 +737,7 @@ final class GlassesManager: ObservableObject {
         case .waitingForDevice:
             connectionState = .searching
         case .streaming:
-            logger.info("🟢 Streaming started")
+            Log.glasses.info("🟢 Streaming started")
             connectionState = .streaming
         case .starting:
             connectionState = .connecting
@@ -741,7 +746,7 @@ final class GlassesManager: ObservableObject {
         case .paused:
             connectionState = .connected
         @unknown default:
-            logger.warning("⚠️ Unknown stream state: \(String(describing: state))")
+            Log.glasses.warning("⚠️ Unknown stream state: \(String(describing: state))")
         }
     }
     
@@ -752,7 +757,7 @@ final class GlassesManager: ObservableObject {
         Task.detached(priority: .utility) {
             let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
             guard status == .authorized || status == .limited else {
-                logger.warning("⚠️ Photo library access denied")
+                Log.glasses.warning("⚠️ Photo library access denied")
                 return
             }
             
@@ -761,9 +766,9 @@ final class GlassesManager: ObservableObject {
                     let creationRequest = PHAssetCreationRequest.forAsset()
                     creationRequest.addResource(with: .photo, data: imageData, options: nil)
                 }
-                logger.info("✅ Photo saved to library")
+                Log.glasses.info("✅ Photo saved to library")
             } catch {
-                logger.error("❌ Failed to save photo: \(error.localizedDescription)")
+                Log.glasses.error("❌ Failed to save photo: \(error.localizedDescription)")
             }
         }
     }
@@ -773,7 +778,7 @@ final class GlassesManager: ObservableObject {
         Task.detached(priority: .utility) {
             let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
             guard status == .authorized || status == .limited else {
-                logger.warning("⚠️ Photo library access denied")
+                Log.glasses.warning("⚠️ Photo library access denied")
                 return
             }
             
@@ -781,9 +786,9 @@ final class GlassesManager: ObservableObject {
                 try await PHPhotoLibrary.shared().performChanges {
                     PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: videoURL)
                 }
-                logger.info("✅ Video saved to library")
+                Log.glasses.info("✅ Video saved to library")
             } catch {
-                logger.error("❌ Failed to save video: \(error.localizedDescription)")
+                Log.glasses.error("❌ Failed to save video: \(error.localizedDescription)")
             }
         }
     }
@@ -795,15 +800,15 @@ final class GlassesManager: ObservableObject {
         do {
             let data = try JSONEncoder().encode(storedItems)
             try data.write(to: Self.mediaStorageURL)
-            logger.info("💾 Saved \(storedItems.count) media items")
+            Log.glasses.info("💾 Saved \(storedItems.count) media items")
         } catch {
-            logger.error("❌ Failed to save media list: \(error.localizedDescription)")
+            Log.glasses.error("❌ Failed to save media list: \(error.localizedDescription)")
         }
     }
     
     private func loadMediaList() {
         guard FileManager.default.fileExists(atPath: Self.mediaStorageURL.path) else {
-            logger.info("📂 No saved media list found")
+            Log.glasses.info("📂 No saved media list found")
             return
         }
         
@@ -813,12 +818,12 @@ final class GlassesManager: ObservableObject {
             let loadedItems = storedItems.compactMap { $0.toMediaItem() }
             let skippedCount = storedItems.count - loadedItems.count
             if skippedCount > 0 {
-                logger.warning("⚠️ Skipped \(skippedCount) media items (files not found)")
+                Log.glasses.warning("⚠️ Skipped \(skippedCount) media items (files not found)")
             }
             capturedMedia = loadedItems
-            logger.info("📂 Loaded \(loadedItems.count) media items")
+            Log.glasses.info("📂 Loaded \(loadedItems.count) media items")
         } catch {
-            logger.error("❌ Failed to load media list: \(error.localizedDescription)")
+            Log.glasses.error("❌ Failed to load media list: \(error.localizedDescription)")
         }
     }
 }
