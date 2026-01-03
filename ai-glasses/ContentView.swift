@@ -434,7 +434,7 @@ private struct VideoThumbnailView: View {
     
     private func generateThumbnail() {
         Task.detached(priority: .utility) {
-            let asset = AVAsset(url: url)
+            let asset = AVURLAsset(url: url)
             let imageGenerator = AVAssetImageGenerator(asset: asset)
             imageGenerator.appliesPreferredTrackTransform = true
             imageGenerator.maximumSize = CGSize(width: 200, height: 200)
