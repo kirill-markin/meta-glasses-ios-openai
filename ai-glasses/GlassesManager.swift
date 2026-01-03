@@ -48,6 +48,58 @@ enum MediaItem: Identifiable, Equatable {
     }
 }
 
+// MARK: - Stored Media Item (for persistence)
+
+private struct StoredMediaItem: Codable {
+    let id: UUID
+    let type: MediaType
+    let timestamp: Date
+    let photoData: Data?
+    let videoPath: String?
+    
+    enum MediaType: String, Codable {
+        case photo
+        case video
+    }
+    
+    init(from mediaItem: MediaItem) {
+        self.id = mediaItem.id
+        self.timestamp = mediaItem.timestamp
+        switch mediaItem {
+        case .photo(_, let data, _):
+            self.type = .photo
+            self.photoData = data
+            self.videoPath = nil
+        case .video(_, let url, _):
+            self.type = .video
+            self.photoData = nil
+            self.videoPath = url.path
+        }
+    }
+    
+    func toMediaItem() -> MediaItem? {
+        switch type {
+        case .photo:
+            guard let data = photoData else {
+                logger.warning("⚠️ Photo data missing for item \(id)")
+                return nil
+            }
+            return .photo(id: id, data: data, timestamp: timestamp)
+        case .video:
+            guard let path = videoPath else {
+                logger.warning("⚠️ Video path missing for item \(id)")
+                return nil
+            }
+            let url = URL(fileURLWithPath: path)
+            guard FileManager.default.fileExists(atPath: path) else {
+                logger.warning("⚠️ Video file not found: \(path) - user may have deleted it")
+                return nil
+            }
+            return .video(id: id, url: url, timestamp: timestamp)
+        }
+    }
+}
+
 // MARK: - Connection State
 
 enum GlassesConnectionState: Equatable {
@@ -117,6 +169,12 @@ final class GlassesManager: ObservableObject {
     private let videoRecorder = VideoRecorder()
     private var pendingRecordingURL: URL?
     
+    // Media persistence
+    private static let mediaStorageURL: URL = {
+        let documentsDirectory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return documentsDirectory.appendingPathComponent("captured_media.json")
+    }()
+    
     // Quick video mode - started stream just for video capture
     private var isQuickVideoMode: Bool = false
     
@@ -132,6 +190,7 @@ final class GlassesManager: ObservableObject {
     init() {
         logger.info("📱 GlassesManager initialized")
         self.wearables = Wearables.shared
+        loadMediaList()
         setupDevicesListener()
         setupRegistrationListener()
     }
@@ -337,6 +396,7 @@ final class GlassesManager: ObservableObject {
             await MainActor.run {
                 let mediaItem = MediaItem.video(id: UUID(), url: outputURL, timestamp: Date())
                 self.capturedMedia.insert(mediaItem, at: 0)
+                self.saveMediaList()
                 self.recordingState = .idle
             }
             logger.info("✅ Recording saved: \(outputURL.lastPathComponent)")
@@ -408,6 +468,7 @@ final class GlassesManager: ObservableObject {
                 Task { @MainActor in
                     let mediaItem = MediaItem.photo(id: UUID(), data: photoData.data, timestamp: Date())
                     self.capturedMedia.insert(mediaItem, at: 0)
+                    self.saveMediaList()
                 }
             }
             
@@ -626,6 +687,7 @@ final class GlassesManager: ObservableObject {
             Task { @MainActor in
                 let mediaItem = MediaItem.photo(id: UUID(), data: photoData.data, timestamp: Date())
                 self.capturedMedia.insert(mediaItem, at: 0)
+                self.saveMediaList()
             }
         }
         
@@ -723,6 +785,40 @@ final class GlassesManager: ObservableObject {
             } catch {
                 logger.error("❌ Failed to save video: \(error.localizedDescription)")
             }
+        }
+    }
+    
+    // MARK: - Media Persistence
+    
+    private func saveMediaList() {
+        let storedItems = capturedMedia.map { StoredMediaItem(from: $0) }
+        do {
+            let data = try JSONEncoder().encode(storedItems)
+            try data.write(to: Self.mediaStorageURL)
+            logger.info("💾 Saved \(storedItems.count) media items")
+        } catch {
+            logger.error("❌ Failed to save media list: \(error.localizedDescription)")
+        }
+    }
+    
+    private func loadMediaList() {
+        guard FileManager.default.fileExists(atPath: Self.mediaStorageURL.path) else {
+            logger.info("📂 No saved media list found")
+            return
+        }
+        
+        do {
+            let data = try Data(contentsOf: Self.mediaStorageURL)
+            let storedItems = try JSONDecoder().decode([StoredMediaItem].self, from: data)
+            let loadedItems = storedItems.compactMap { $0.toMediaItem() }
+            let skippedCount = storedItems.count - loadedItems.count
+            if skippedCount > 0 {
+                logger.warning("⚠️ Skipped \(skippedCount) media items (files not found)")
+            }
+            capturedMedia = loadedItems
+            logger.info("📂 Loaded \(loadedItems.count) media items")
+        } catch {
+            logger.error("❌ Failed to load media list: \(error.localizedDescription)")
         }
     }
 }
