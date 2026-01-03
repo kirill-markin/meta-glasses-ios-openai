@@ -10,6 +10,10 @@
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Needed to record audio from Meta Wearables</string>
 	
+	<!-- Photo Library permission for saving photos and videos -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Needed to save photos and videos from Meta Wearables to your library</string>
+	
 	<!-- Allow Meta AI (fb-viewapp) to call the app -->
 	<key>LSApplicationQueriesSchemes</key>
 	<array>

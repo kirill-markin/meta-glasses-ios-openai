@@ -11,6 +11,7 @@ import UIKit
 import MWDATCore
 import MWDATCamera
 import AVFoundation
+import Photos
 import os.log
 
 // MARK: - Logging
@@ -303,6 +304,7 @@ final class GlassesManager: ObservableObject {
         
         do {
             let outputURL = try await videoRecorder.stopRecording()
+            saveVideoToLibrary(videoURL: outputURL)
             await MainActor.run {
                 self.lastRecordedVideoURL = outputURL
                 self.recordingState = .idle
@@ -372,6 +374,7 @@ final class GlassesManager: ObservableObject {
             let photoToken = tempSession.photoDataPublisher.listen { [weak self] (photoData: PhotoData) in
                 guard let self else { return }
                 logger.info("📸 Photo received: \(photoData.data.count) bytes")
+                self.savePhotoToLibrary(imageData: photoData.data)
                 Task { @MainActor in
                     self.lastCapturedPhoto = photoData.data
                 }
@@ -588,6 +591,7 @@ final class GlassesManager: ObservableObject {
         photoListenerToken = session.photoDataPublisher.listen { [weak self] (photoData: PhotoData) in
             guard let self else { return }
             logger.info("📸 Photo received: \(photoData.data.count) bytes")
+            self.savePhotoToLibrary(imageData: photoData.data)
             Task { @MainActor in
                 self.lastCapturedPhoto = photoData.data
             }
@@ -644,6 +648,47 @@ final class GlassesManager: ObservableObject {
             connectionState = .connected
         @unknown default:
             logger.warning("⚠️ Unknown stream state: \(String(describing: state))")
+        }
+    }
+    
+    // MARK: - Photo Library Saving
+    
+    private func savePhotoToLibrary(imageData: Data) {
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            guard status == .authorized || status == .limited else {
+                logger.warning("⚠️ Photo library access denied")
+                return
+            }
+            
+            PHPhotoLibrary.shared().performChanges {
+                let creationRequest = PHAssetCreationRequest.forAsset()
+                creationRequest.addResource(with: .photo, data: imageData, options: nil)
+            } completionHandler: { success, error in
+                if success {
+                    logger.info("✅ Photo saved to library")
+                } else if let error = error {
+                    logger.error("❌ Failed to save photo: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    
+    private func saveVideoToLibrary(videoURL: URL) {
+        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+            guard status == .authorized || status == .limited else {
+                logger.warning("⚠️ Photo library access denied")
+                return
+            }
+            
+            PHPhotoLibrary.shared().performChanges {
+                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: videoURL)
+            } completionHandler: { success, error in
+                if success {
+                    logger.info("✅ Video saved to library")
+                } else if let error = error {
+                    logger.error("❌ Failed to save video: \(error.localizedDescription)")
+                }
+            }
         }
     }
 }
