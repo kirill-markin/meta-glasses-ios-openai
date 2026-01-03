@@ -653,41 +653,43 @@ final class GlassesManager: ObservableObject {
     
     // MARK: - Photo Library Saving
     
-    private func savePhotoToLibrary(imageData: Data) {
-        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+    /// Save photo to Photo Library. Can be called from any context.
+    nonisolated private func savePhotoToLibrary(imageData: Data) {
+        Task.detached(priority: .utility) {
+            let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
             guard status == .authorized || status == .limited else {
                 logger.warning("⚠️ Photo library access denied")
                 return
             }
             
-            PHPhotoLibrary.shared().performChanges {
-                let creationRequest = PHAssetCreationRequest.forAsset()
-                creationRequest.addResource(with: .photo, data: imageData, options: nil)
-            } completionHandler: { success, error in
-                if success {
-                    logger.info("✅ Photo saved to library")
-                } else if let error = error {
-                    logger.error("❌ Failed to save photo: \(error.localizedDescription)")
+            do {
+                try await PHPhotoLibrary.shared().performChanges {
+                    let creationRequest = PHAssetCreationRequest.forAsset()
+                    creationRequest.addResource(with: .photo, data: imageData, options: nil)
                 }
+                logger.info("✅ Photo saved to library")
+            } catch {
+                logger.error("❌ Failed to save photo: \(error.localizedDescription)")
             }
         }
     }
     
-    private func saveVideoToLibrary(videoURL: URL) {
-        PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+    /// Save video to Photo Library. Can be called from any context.
+    nonisolated private func saveVideoToLibrary(videoURL: URL) {
+        Task.detached(priority: .utility) {
+            let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
             guard status == .authorized || status == .limited else {
                 logger.warning("⚠️ Photo library access denied")
                 return
             }
             
-            PHPhotoLibrary.shared().performChanges {
-                PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: videoURL)
-            } completionHandler: { success, error in
-                if success {
-                    logger.info("✅ Video saved to library")
-                } else if let error = error {
-                    logger.error("❌ Failed to save video: \(error.localizedDescription)")
+            do {
+                try await PHPhotoLibrary.shared().performChanges {
+                    PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: videoURL)
                 }
+                logger.info("✅ Video saved to library")
+            } catch {
+                logger.error("❌ Failed to save video: \(error.localizedDescription)")
             }
         }
     }
