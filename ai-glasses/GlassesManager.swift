@@ -110,13 +110,26 @@ final class GlassesManager: ObservableObject {
             logger.info("📝 Already registered, skipping")
             return
         }
-        logger.info("📝 Starting registration with Meta AI app...")
-        do {
-            try wearables.startRegistration()
-            logger.info("✅ Registration started - check Meta AI app")
-        } catch {
-            logger.warning("⚠️ Registration request failed: \(error.localizedDescription)")
-            // Don't set error state - registration might complete via callback
+        
+        Task {
+            // Check current registration state from stream before attempting
+            for await state in wearables.registrationStateStream() {
+                if case .registered = state {
+                    logger.info("📝 Already registered (confirmed from stream), skipping")
+                    await MainActor.run { self.isRegistered = true }
+                    return
+                }
+                // Got first state, it's not registered - proceed
+                break
+            }
+            
+            logger.info("📝 Starting registration with Meta AI app...")
+            do {
+                try wearables.startRegistration()
+                logger.info("✅ Registration started - check Meta AI app")
+            } catch {
+                logger.warning("⚠️ Registration request failed: \(error.localizedDescription)")
+            }
         }
     }
     
