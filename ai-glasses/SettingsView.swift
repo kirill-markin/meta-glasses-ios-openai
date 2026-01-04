@@ -11,12 +11,6 @@ import os.log
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "ai-glasses", category: "SettingsView")
 
-// Wrapper for memory key to use with sheet(item:)
-private struct MemoryItem: Identifiable {
-    let id: String
-    let value: String
-}
-
 // MARK: - Custom TextView (avoids SwiftUI TextEditor frame bugs)
 
 private struct CustomTextView: UIViewRepresentable {
@@ -61,15 +55,37 @@ private struct CustomTextView: UIViewRepresentable {
     }
 }
 
+// MARK: - Settings View (Main Menu)
+
 struct SettingsView: View {
     @ObservedObject var glassesManager: GlassesManager
-    @ObservedObject private var settingsManager = SettingsManager.shared
-    @State private var userPrompt: String = ""
-    @State private var selectedMemory: MemoryItem?
+    
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
+    }
+    
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "—"
+    }
     
     var body: some View {
         NavigationStack {
             Form {
+                // Main Settings
+                Section {
+                    NavigationLink {
+                        AdditionalInstructionsView()
+                    } label: {
+                        Label("Additional Instructions", systemImage: "text.quote")
+                    }
+                    
+                    NavigationLink {
+                        MemoriesListView()
+                    } label: {
+                        Label("Memories", systemImage: "brain")
+                    }
+                }
+                
                 // Developer Section
                 Section {
                     NavigationLink {
@@ -81,85 +97,126 @@ struct SettingsView: View {
                     Text("Developer")
                 }
                 
-                // User Prompt Section
+                // App Info
                 Section {
-                    CustomTextView(text: $userPrompt)
-                        .frame(height: 120)
-                        .onChange(of: userPrompt) { _, newValue in
-                            settingsManager.userPrompt = newValue
-                        }
-                } header: {
-                    Text("Additional Instructions")
-                } footer: {
-                    Text("These instructions will be added to the AI assistant's system prompt.")
-                }
-                
-                // Memories Section
-                Section {
-                    if settingsManager.memories.isEmpty {
-                        Text("No memories yet")
+                    HStack {
+                        Text("Version")
+                        Spacer()
+                        Text(appVersion)
                             .foregroundColor(.secondary)
-                            .italic()
-                    } else {
-                        ForEach(sortedMemoryKeys, id: \.self) { key in
-                            MemoryRowView(
-                                key: key,
-                                value: settingsManager.memories[key] ?? "",
-                                onTap: {
-                                    selectedMemory = MemoryItem(
-                                        id: key,
-                                        value: settingsManager.memories[key] ?? ""
-                                    )
-                                }
-                            )
-                        }
-                        .onDelete(perform: deleteMemories)
                     }
-                    
-                    Button(action: addMemory) {
-                        Label("Add Memory", systemImage: "plus.circle")
+                    HStack {
+                        Text("Build")
+                        Spacer()
+                        Text(buildNumber)
+                            .foregroundColor(.secondary)
                     }
                 } header: {
-                    Text("Memories")
-                } footer: {
-                    Text("The AI can add, update, or delete memories during conversations. You can also manage them here.")
+                    Text("About")
                 }
-                
             }
-            .scrollDismissesKeyboard(.interactively)
-            .simultaneousGesture(TapGesture().onEnded {
-                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-            })
             .navigationTitle("Settings")
-            .onAppear {
-                userPrompt = settingsManager.userPrompt
-            }
-            .onDisappear {
-                settingsManager.saveNow()
-            }
-            .sheet(item: $selectedMemory) { memory in
-                MemoryEditorView(
-                    originalKey: memory.id,
-                    originalValue: memory.value,
-                    onSave: { newKey, newValue in
-                        settingsManager.updateMemory(oldKey: memory.id, newKey: newKey, value: newValue)
-                        selectedMemory = nil
-                    },
-                    onCancel: {
-                        selectedMemory = nil
-                    }
-                )
-            }
         }
     }
+}
+
+// MARK: - Additional Instructions View
+
+private struct AdditionalInstructionsView: View {
+    @ObservedObject private var settingsManager = SettingsManager.shared
+    @State private var text: String = ""
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        CustomTextView(text: $text)
+            .padding()
+            .navigationTitle("Additional Instructions")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        settingsManager.userPrompt = text
+                        settingsManager.saveNow()
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                text = settingsManager.userPrompt
+            }
+    }
+}
+
+// MARK: - Memories List View
+
+private struct MemoriesListView: View {
+    @ObservedObject private var settingsManager = SettingsManager.shared
+    @State private var selectedMemoryKey: String?
     
     private var sortedMemoryKeys: [String] {
         settingsManager.memories.keys.sorted()
     }
     
+    var body: some View {
+        Form {
+            if settingsManager.memories.isEmpty {
+                Section {
+                    Text("No memories yet")
+                        .foregroundColor(.secondary)
+                        .italic()
+                } footer: {
+                    Text("The AI can add memories during conversations, or you can add them manually.")
+                }
+            } else {
+                Section {
+                    ForEach(sortedMemoryKeys, id: \.self) { key in
+                        NavigationLink {
+                            MemoryEditorView(
+                                memoryKey: key,
+                                onDelete: {
+                                    settingsManager.deleteMemory(key: key)
+                                }
+                            )
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(key)
+                                    .font(.headline)
+                                
+                                if let value = settingsManager.memories[key], !value.isEmpty {
+                                    Text(value)
+                                        .font(.subheadline)
+                                        .foregroundColor(.secondary)
+                                        .lineLimit(2)
+                                }
+                            }
+                        }
+                    }
+                    .onDelete(perform: deleteMemories)
+                }
+            }
+            
+            Section {
+                Button(action: addMemory) {
+                    Label("Add Memory", systemImage: "plus.circle")
+                }
+            }
+        }
+        .navigationTitle("Memories")
+        .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(item: $selectedMemoryKey) { key in
+            MemoryEditorView(
+                memoryKey: key,
+                onDelete: {
+                    settingsManager.deleteMemory(key: key)
+                    selectedMemoryKey = nil
+                }
+            )
+        }
+    }
+    
     private func addMemory() {
         let newKey = settingsManager.addEmptyMemory()
-        selectedMemory = MemoryItem(id: newKey, value: "")
+        selectedMemoryKey = newKey
     }
     
     private func deleteMemories(at offsets: IndexSet) {
@@ -170,96 +227,72 @@ struct SettingsView: View {
     }
 }
 
-// MARK: - Memory Row View
-
-private struct MemoryRowView: View {
-    let key: String
-    let value: String
-    let onTap: () -> Void
-    
-    var body: some View {
-        Button(action: onTap) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(key)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    if !value.isEmpty {
-                        Text(value)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                            .lineLimit(2)
-                    }
-                }
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .foregroundColor(.secondary)
-                    .font(.caption)
-            }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 // MARK: - Memory Editor View
 
 private struct MemoryEditorView: View {
-    let originalKey: String
-    let originalValue: String
-    let onSave: (String, String) -> Void
-    let onCancel: () -> Void
+    let memoryKey: String
+    let onDelete: () -> Void
     
+    @ObservedObject private var settingsManager = SettingsManager.shared
     @State private var key: String = ""
     @State private var value: String = ""
+    @State private var showingDeleteConfirmation = false
+    @Environment(\.dismiss) private var dismiss
+    
+    private var isNewMemory: Bool {
+        memoryKey.starts(with: "new_memory")
+    }
     
     var body: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    TextField("Key", text: $key)
-                        .autocapitalization(.none)
-                        .autocorrectionDisabled()
-                } header: {
-                    Text("Key")
-                } footer: {
-                    Text("A short identifier for this memory (e.g., 'user_name', 'favorite_color')")
-                }
-                
-                Section {
-                    CustomTextView(text: $value)
-                        .frame(height: 100)
-                } header: {
-                    Text("Value")
-                } footer: {
-                    Text("The information to remember")
-                }
+        Form {
+            Section {
+                TextField("Key", text: $key)
+                    .autocapitalization(.none)
+                    .autocorrectionDisabled()
+            } header: {
+                Text("Key")
+            } footer: {
+                Text("A short identifier (e.g., 'user_name', 'favorite_color')")
             }
-            .scrollDismissesKeyboard(.interactively)
-            .simultaneousGesture(TapGesture().onEnded {
-                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-            })
-            .navigationTitle(originalKey.starts(with: "new_memory") ? "New Memory" : "Edit Memory")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel", action: onCancel)
-                }
-                
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        onSave(key, value)
+            
+            Section {
+                CustomTextView(text: $value)
+                    .frame(height: 150)
+            } header: {
+                Text("Value")
+            }
+            
+            if !isNewMemory {
+                Section {
+                    Button(role: .destructive) {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        Label("Delete Memory", systemImage: "trash")
                     }
-                    .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
-            .onAppear {
-                key = originalKey
-                value = originalValue
+        }
+        .navigationTitle(isNewMemory ? "New Memory" : "Edit Memory")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Save") {
+                    settingsManager.updateMemory(oldKey: memoryKey, newKey: key, value: value)
+                    dismiss()
+                }
+                .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
+        }
+        .confirmationDialog("Delete this memory?", isPresented: $showingDeleteConfirmation, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) {
+                onDelete()
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .onAppear {
+            key = memoryKey
+            value = settingsManager.memories[memoryKey] ?? ""
         }
     }
 }
