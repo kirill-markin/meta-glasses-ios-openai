@@ -107,6 +107,9 @@ final class RealtimeAPIClient: ObservableObject {
     // Track if response is currently active (for barge-in)
     private var isResponseActive = false
     
+    // Track if assistant message was already finalized (for barge-in deduplication)
+    private var assistantMessageFinalized = false
+    
     // MARK: - Initialization
     
     init(apiKey: String) {
@@ -676,6 +679,7 @@ final class RealtimeAPIClient: ObservableObject {
             // Clear transcript for new response
             assistantTranscript = ""
             isResponseActive = true
+            assistantMessageFinalized = false
             
         case "response.audio.delta":
             if let delta = json["delta"] as? String,
@@ -694,9 +698,13 @@ final class RealtimeAPIClient: ObservableObject {
             
         case "response.audio_transcript.done":
             if let transcript = json["transcript"] as? String {
-                assistantTranscript = transcript
-                messages.append(ChatMessage(isUser: false, text: transcript))
-                logger.info("🤖 Assistant: \(transcript)")
+                // Only add message if not already finalized during barge-in
+                if !assistantMessageFinalized {
+                    messages.append(ChatMessage(isUser: false, text: transcript))
+                    logger.info("🤖 Assistant: \(transcript)")
+                } else {
+                    logger.info("🤖 Assistant transcript received (already finalized during barge-in)")
+                }
                 // Clear for next response
                 assistantTranscript = ""
             }
@@ -741,6 +749,16 @@ final class RealtimeAPIClient: ObservableObject {
                 if isResponseActive {
                     cancelResponse()
                     isResponseActive = false
+                }
+                
+                // Finalize interrupted AI message before adding user placeholder
+                // This ensures correct message order (AI message appears before user's interruption)
+                if !assistantTranscript.isEmpty {
+                    let interruptedText = assistantTranscript + "..."
+                    messages.append(ChatMessage(isUser: false, text: interruptedText))
+                    logger.info("🤖 Assistant (interrupted): \(interruptedText)")
+                    assistantTranscript = ""
+                    assistantMessageFinalized = true // Prevent duplicate from response.audio_transcript.done
                 }
             }
             
