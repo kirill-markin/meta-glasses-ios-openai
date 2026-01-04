@@ -17,7 +17,6 @@ iOS app for experimenting with Meta Ray-Ban smart glasses.
 ### OpenAI Realtime API
 - Docs: https://platform.openai.com/docs/guides/realtime
 - WebSocket endpoint: `wss://api.openai.com/v1/realtime?model=gpt-realtime`
-- Audio format: PCM16, 24kHz, mono
 
 ## Architecture
 
@@ -30,7 +29,22 @@ iOS app for experimenting with Meta Ray-Ban smart glasses.
 ### Voice Agent Tab
 - `RealtimeAPIClient` - WebSocket client for OpenAI Realtime API with audio capture/playback
 - `VoiceAgentView` - UI for voice conversations with OpenAI
-- `Config` - API keys (gitignored)
+- `Config` - API keys (copy `Config.swift.example` → `Config.swift`)
+
+### Voice Agent Features
+- Server VAD + LLM intent classifier (gpt-4o-mini) decides when to respond
+- Tool: `take_photo` - AI can capture photos from glasses during conversation
+- Barge-in: user can interrupt AI while speaking
+
+### Audio
+- OpenAI format: PCM16, 24kHz, mono
+- HFP (Hands-Free Profile) for glasses Bluetooth mic
+- Auto-conversion between device and OpenAI formats
+
+### Media Persistence
+- Files saved to Documents directory
+- Metadata in `captured_media.json`
+- Auto-save to Photo Library
 
 ## Key SDK Classes
 
@@ -38,6 +52,12 @@ iOS app for experimenting with Meta Ray-Ban smart glasses.
 - `AutoDeviceSelector` - automatic device selection
 - `StreamSession` - video streaming and photo capture
 - `VideoFrame.makeUIImage()` - convert frame to UIImage
+
+## Key Patterns
+
+- `@MainActor` isolation for GlassesManager, RealtimeAPIClient
+- LazyView for deferred VoiceAgentView initialization
+- Listener tokens retained for SDK stream subscriptions
 
 ## Requirements
 
