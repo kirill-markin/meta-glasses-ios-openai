@@ -184,8 +184,12 @@ final class ThreadsManager: ObservableObject {
         
         let prompt = """
         Generate a title for this conversation (4 words max).
+        Use the SAME LANGUAGE as the conversation (Russian title for Russian chat, English for English, etc.).
         Only the essence - specific topic/subject discussed.
-        No generic words like "discussion", "chat", "help", "question", "решение", "обсуждение".
+        Use SHORT words - avoid long descriptive words.
+        Examples: "location" not "geolocation", "place" not "whereabouts", "fix" not "troubleshooting".
+        Avoid vague words like "definition", "information", "data", "overview" - be specific.
+        No generic words like "discussion", "chat", "help", "question", "issue", "problem".
         No action descriptions - it's obvious that conversations involve discussing and solving.
         Return ONLY the title, no quotes, no explanation.
         
