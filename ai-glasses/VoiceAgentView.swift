@@ -10,6 +10,24 @@ import os.log
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "ai-glasses", category: "VoiceAgentView")
 
+// MARK: - Scroll Position Tracking
+
+/// PreferenceKey to track the scroll content frame relative to the scroll view
+private struct ScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
+/// PreferenceKey to track the scroll view frame height
+private struct ScrollViewHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
 struct VoiceAgentView: View {
     @ObservedObject var glassesManager: GlassesManager
     @StateObject private var client: RealtimeAPIClient
@@ -285,26 +303,97 @@ private struct ConnectedView: View {
     let onToggleMute: () -> Void
     let onForceResponse: () -> Void
     
+    // Scroll tracking state
+    @State private var isAutoScrollEnabled: Bool = true
+    @State private var contentHeight: CGFloat = 0
+    @State private var scrollViewHeight: CGFloat = 0
+    @State private var scrollOffset: CGFloat = 0
+    @State private var scrollDebounceTask: Task<Void, Never>?
+    
+    // Threshold for considering user "at bottom"
+    private let bottomThreshold: CGFloat = 50
+    // Debounce interval for scroll during streaming
+    private let scrollDebounceInterval: UInt64 = 150_000_000 // 150ms in nanoseconds
+    
     var body: some View {
         VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Session status (compact)
-                    SessionStatusBar(
-                        isSessionConfigured: client.isSessionConfigured,
-                        voiceState: client.voiceState,
-                        isMuted: client.isMuted
-                    )
-                    
-                    // Transcript area
-                    TranscriptCard(
-                        messages: client.messages,
-                        currentUserTranscript: client.userTranscript,
-                        currentAssistantTranscript: client.assistantTranscript,
-                        voiceState: client.voiceState
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Session status (compact)
+                        SessionStatusBar(
+                            isSessionConfigured: client.isSessionConfigured,
+                            voiceState: client.voiceState,
+                            isMuted: client.isMuted
+                        )
+                        
+                        // Transcript area
+                        TranscriptCard(
+                            messages: client.messages,
+                            currentUserTranscript: client.userTranscript,
+                            currentAssistantTranscript: client.assistantTranscript,
+                            voiceState: client.voiceState
+                        )
+                        
+                        // Invisible anchor for scrolling to bottom
+                        Color.clear
+                            .frame(height: 1)
+                            .id("bottom")
+                    }
+                    .padding()
+                    // Track content position relative to scroll view
+                    .background(
+                        GeometryReader { geometry in
+                            Color.clear.preference(
+                                key: ScrollOffsetPreferenceKey.self,
+                                value: geometry.frame(in: .named("scrollView")).maxY
+                            )
+                        }
                     )
                 }
-                .padding()
+                .coordinateSpace(name: "scrollView")
+                // Track scroll view height
+                .background(
+                    GeometryReader { geometry in
+                        Color.clear
+                            .preference(key: ScrollViewHeightPreferenceKey.self, value: geometry.size.height)
+                            .onAppear { scrollViewHeight = geometry.size.height }
+                    }
+                )
+                .onPreferenceChange(ScrollOffsetPreferenceKey.self) { maxY in
+                    let previousOffset = scrollOffset
+                    scrollOffset = maxY
+                    
+                    // Check if user is near bottom
+                    let distanceFromBottom = maxY - scrollViewHeight
+                    let isNearBottom = distanceFromBottom < bottomThreshold
+                    
+                    // If user scrolled up (maxY increased beyond threshold), disable auto-scroll
+                    if !isNearBottom && maxY > previousOffset + 10 {
+                        isAutoScrollEnabled = false
+                    }
+                    
+                    // If user scrolled back to bottom, re-enable auto-scroll
+                    if isNearBottom {
+                        isAutoScrollEnabled = true
+                    }
+                }
+                .onPreferenceChange(ScrollViewHeightPreferenceKey.self) { height in
+                    scrollViewHeight = height
+                }
+                // Auto-scroll when messages or transcript changes
+                .onChange(of: client.messages.count) { _, _ in
+                    scrollToBottomDebounced(proxy: proxy)
+                }
+                .onChange(of: client.assistantTranscript) { _, _ in
+                    scrollToBottomDebounced(proxy: proxy)
+                }
+                .onChange(of: client.voiceState) { _, newState in
+                    // Scroll when AI starts speaking or processing
+                    if newState == .speaking || newState == .processing {
+                        scrollToBottomDebounced(proxy: proxy)
+                    }
+                }
             }
             
             // Bottom controls
@@ -316,6 +405,29 @@ private struct ConnectedView: View {
                 onToggleMute: onToggleMute,
                 onForceResponse: onForceResponse
             )
+        }
+    }
+    
+    /// Scroll to bottom with debouncing to prevent jitter during streaming
+    private func scrollToBottomDebounced(proxy: ScrollViewProxy) {
+        guard isAutoScrollEnabled else { return }
+        
+        // Cancel previous debounce task
+        scrollDebounceTask?.cancel()
+        
+        scrollDebounceTask = Task {
+            do {
+                try await Task.sleep(nanoseconds: scrollDebounceInterval)
+                guard !Task.isCancelled else { return }
+                
+                await MainActor.run {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        proxy.scrollTo("bottom", anchor: .bottom)
+                    }
+                }
+            } catch {
+                // Task was cancelled, ignore
+            }
         }
     }
 }
