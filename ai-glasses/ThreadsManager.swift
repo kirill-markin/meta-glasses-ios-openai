@@ -183,7 +183,10 @@ final class ThreadsManager: ObservableObject {
         }
         
         let prompt = """
-        Based on this conversation, generate a very short title (4-5 words max) that captures the main topic. 
+        Generate a title for this conversation (4 words max).
+        Only the essence - specific topic/subject discussed.
+        No generic words like "discussion", "chat", "help", "question", "решение", "обсуждение".
+        No action descriptions - it's obvious that conversations involve discussing and solving.
         Return ONLY the title, no quotes, no explanation.
         
         Conversation:
