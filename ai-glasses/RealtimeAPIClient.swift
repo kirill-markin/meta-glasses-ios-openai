@@ -110,6 +110,12 @@ final class RealtimeAPIClient: ObservableObject {
     // Track if assistant message was already finalized (for barge-in deduplication)
     private var assistantMessageFinalized = false
     
+    // Track pending audio buffers to know when playback is actually finished
+    private var pendingAudioBufferCount = 0
+    
+    // Track if we received response.done (separate from actual playback completion)
+    private var responseGenerationComplete = false
+    
     // MARK: - Initialization
     
     init(apiKey: String) {
@@ -170,6 +176,8 @@ final class RealtimeAPIClient: ObservableObject {
         assistantTranscript = ""
         messages = []
         pendingUserMessageId = nil
+        pendingAudioBufferCount = 0
+        responseGenerationComplete = false
     }
     
     /// Start listening to microphone and streaming to OpenAI
@@ -407,9 +415,21 @@ final class RealtimeAPIClient: ObservableObject {
         let needsConversion = openAIFormat.sampleRate != outputFormat.sampleRate ||
                               openAIFormat.channelCount != outputFormat.channelCount
         
+        // Increment pending buffer count before scheduling
+        pendingAudioBufferCount += 1
+        
+        // Completion handler for tracking actual playback completion
+        // Uses @Sendable closure for thread safety
+        let completionHandler: @Sendable (AVAudioPlayerNodeCompletionCallbackType) -> Void = { [weak self] _ in
+            Task { @MainActor in
+                self?.handleAudioBufferPlaybackComplete()
+            }
+        }
+        
         if needsConversion {
             guard let converter = AVAudioConverter(from: openAIFormat, to: outputFormat) else {
                 logger.error("❌ Failed to create playback converter")
+                pendingAudioBufferCount -= 1
                 return
             }
             
@@ -419,6 +439,7 @@ final class RealtimeAPIClient: ObservableObject {
             
             guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: outputFrameCount) else {
                 logger.error("❌ Failed to create output buffer")
+                pendingAudioBufferCount -= 1
                 return
             }
             
@@ -432,12 +453,28 @@ final class RealtimeAPIClient: ObservableObject {
             
             if let error = error {
                 logger.error("❌ Conversion error: \(error.localizedDescription)")
+                pendingAudioBufferCount -= 1
                 return
             }
             
-            playerNode.scheduleBuffer(outputBuffer)
+            // Use .dataPlayedBack to get callback only after audio is actually played
+            playerNode.scheduleBuffer(outputBuffer, completionCallbackType: .dataPlayedBack, completionHandler: completionHandler)
         } else {
-            playerNode.scheduleBuffer(sourceBuffer)
+            playerNode.scheduleBuffer(sourceBuffer, completionCallbackType: .dataPlayedBack, completionHandler: completionHandler)
+        }
+    }
+    
+    /// Called when an audio buffer finishes playing (via .dataPlayedBack callback)
+    private func handleAudioBufferPlaybackComplete() {
+        pendingAudioBufferCount -= 1
+        
+        // Only transition to idle when ALL buffers are done AND response generation is complete
+        if pendingAudioBufferCount <= 0 && responseGenerationComplete {
+            pendingAudioBufferCount = 0
+            if voiceState == .speaking {
+                voiceState = .idle
+                logger.info("🔇 All audio buffers finished playing")
+            }
         }
     }
     
@@ -492,6 +529,7 @@ final class RealtimeAPIClient: ObservableObject {
         playerNode?.stop()
         // Clear any scheduled buffers by stopping and restarting
         playerNode?.play()
+        // Note: pendingAudioBufferCount is reset by the caller when needed
         logger.info("🔇 Playback stopped")
     }
     
@@ -680,6 +718,7 @@ final class RealtimeAPIClient: ObservableObject {
             assistantTranscript = ""
             isResponseActive = true
             assistantMessageFinalized = false
+            responseGenerationComplete = false
             
         case "response.audio.delta":
             if let delta = json["delta"] as? String,
@@ -742,10 +781,15 @@ final class RealtimeAPIClient: ObservableObject {
         case "input_audio_buffer.speech_started":
             logger.info("🎙️ Speech started (VAD)")
             
-            // Barge-in: stop AI response if user starts talking
-            if voiceState == .speaking || isResponseActive {
-                logger.info("🛑 Barge-in: stopping AI response")
+            // Always stop any playing audio when user starts speaking
+            // This handles the case where response.done was received but audio is still playing
+            let wasPlaying = pendingAudioBufferCount > 0 || voiceState == .speaking || isResponseActive
+            
+            if wasPlaying {
+                logger.info("🛑 Barge-in: stopping AI audio (pending buffers: \(self.pendingAudioBufferCount))")
                 stopPlayback()
+                pendingAudioBufferCount = 0
+                
                 if isResponseActive {
                     cancelResponse()
                     isResponseActive = false
@@ -778,9 +822,17 @@ final class RealtimeAPIClient: ObservableObject {
             logger.info("📥 Audio buffer committed")
             
         case "response.done":
-            logger.info("✅ Response complete")
+            logger.info("✅ Response generation complete")
             isResponseActive = false
-            voiceState = .idle
+            responseGenerationComplete = true
+            
+            // Only set idle if all audio buffers have finished playing
+            if pendingAudioBufferCount <= 0 {
+                voiceState = .idle
+                logger.info("🔇 No pending audio buffers, going idle")
+            } else {
+                logger.info("⏳ Waiting for \(self.pendingAudioBufferCount) audio buffers to finish playing")
+            }
             
         case "error":
             if let error = json["error"] as? [String: Any],
