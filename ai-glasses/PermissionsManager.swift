@@ -74,7 +74,7 @@ enum PermissionType: String, CaseIterable, Identifiable {
         case .photoLibrary:
             return "Photos and videos captured from glasses are saved to your Photo Library. This is ADD-ONLY access — the app cannot see or read any of your existing photos or videos."
         case .bluetooth:
-            return "App can discover and connect to your Meta Ray-Ban glasses."
+            return "App can discover and connect to your Meta glasses."
         }
     }
     

@@ -643,7 +643,7 @@ private struct BluetoothPermissionView: View {
                         .multilineTextAlignment(.center)
                     
                     Text(state == .priming
-                         ? "Voice Agent needs Bluetooth to connect to your Meta Ray-Ban glasses.\nWithout Bluetooth, the app cannot communicate with your glasses."
+                         ? "Voice Agent needs Bluetooth to connect to your Meta glasses.\nWithout Bluetooth, the app cannot communicate with your glasses."
                          : "You've previously denied Bluetooth access.\nTo use Voice Agent with glasses, please enable it in Settings.")
                         .font(.subheadline)
                         .foregroundColor(.secondary)

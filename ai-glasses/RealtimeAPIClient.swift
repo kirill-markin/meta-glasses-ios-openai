@@ -139,10 +139,10 @@ final class RealtimeAPIClient: ObservableObject {
     
     // Base system instructions (without user customizations)
     private let baseInstructions = """
-        You are a helpful voice assistant integrated into Meta Ray-Ban smart glasses. 
+        You are a helpful voice assistant integrated into Meta smart glasses. 
         
         # Context
-        - The user is wearing Meta Ray-Ban AI glasses with a built-in camera
+        - The user is wearing Meta AI glasses with a built-in camera
         - You hear the user through the glasses microphone
         - The user hears your responses through the glasses speakers
         - This is a hands-free, eyes-up experience - keep responses concise
@@ -756,7 +756,7 @@ final class RealtimeAPIClient: ObservableObject {
         let context = recentTranscripts.suffix(maxRecentTranscripts).joined(separator: "\n")
         
         let prompt = """
-            You are an intent classifier for a voice assistant in Meta Ray-Ban smart glasses with a camera.
+            You are an intent classifier for a voice assistant in Meta smart glasses with a camera.
             
             The assistant can:
             - Answer questions

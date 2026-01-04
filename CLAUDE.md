@@ -1,6 +1,6 @@
 # AI Glasses
 
-iOS app for experimenting with Meta Ray-Ban smart glasses.
+iOS app for experimenting with Meta smart glasses.
 
 ## Stack
 
@@ -76,5 +76,5 @@ iOS app for experimenting with Meta Ray-Ban smart glasses.
 ## Requirements
 
 - Physical iOS device (simulator doesn't support Bluetooth)
-- Meta Ray-Ban AI glasses paired with device
+- Meta AI glasses paired with device
 - MetaAppID from https://developer.meta.com (add to Info.plist)
