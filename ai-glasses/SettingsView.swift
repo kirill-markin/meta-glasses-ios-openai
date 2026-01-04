@@ -518,17 +518,44 @@ private struct PermissionsView: View {
     @ObservedObject private var permissionsManager = PermissionsManager.shared
     @Environment(\.scenePhase) private var scenePhase
     
+    private var requiredPermissions: [PermissionType] {
+        PermissionType.allCases.filter { $0.isRequired }
+    }
+    
+    private var optionalPermissions: [PermissionType] {
+        PermissionType.allCases.filter { !$0.isRequired }
+    }
+    
     var body: some View {
         List {
-            ForEach(PermissionType.allCases) { permission in
-                NavigationLink {
-                    PermissionDetailView(permission: permission)
-                } label: {
-                    PermissionRow(
-                        permission: permission,
-                        status: permissionsManager.status(for: permission)
-                    )
+            Section {
+                ForEach(requiredPermissions) { permission in
+                    NavigationLink {
+                        PermissionDetailView(permission: permission)
+                    } label: {
+                        PermissionRow(
+                            permission: permission,
+                            status: permissionsManager.status(for: permission)
+                        )
+                    }
                 }
+            } header: {
+                Text("Required")
+            }
+            
+            Section {
+                ForEach(optionalPermissions) { permission in
+                    NavigationLink {
+                        PermissionDetailView(permission: permission)
+                    } label: {
+                        PermissionRow(
+                            permission: permission,
+                            status: permissionsManager.status(for: permission)
+                        )
+                    }
+                }
+            } header: {
+                Text("Optional")
             }
         }
         .navigationTitle("Permissions")
@@ -572,9 +599,21 @@ private struct PermissionRow: View {
                 Text(permission.rawValue)
                     .font(.body)
                 
-                Text(status.rawValue)
-                    .font(.caption)
-                    .foregroundColor(statusColor)
+                HStack(spacing: 4) {
+                    Text(status.rawValue)
+                        .font(.caption)
+                        .foregroundColor(statusColor)
+                    
+                    if let level = permission.accessLevel,
+                       status == .authorized || status == .limited {
+                        Text("·")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Text(level)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
             }
             
             Spacer()
@@ -626,6 +665,13 @@ private struct PermissionDetailView: View {
                         Text(status.rawValue)
                             .font(.headline)
                             .foregroundColor(statusColor)
+                        
+                        if let level = permission.accessLevel,
+                           status == .authorized || status == .limited {
+                            Text("Access Level: \(level)")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                     }
                     .padding(.leading, 8)
                 }

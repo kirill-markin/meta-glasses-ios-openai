@@ -90,6 +90,21 @@ enum PermissionType: String, CaseIterable, Identifiable {
             return "Cannot connect to glasses. The app will not be able to discover or pair with your glasses."
         }
     }
+    
+    var isRequired: Bool {
+        switch self {
+        case .bluetooth, .microphone: return true
+        case .location, .photoLibrary: return false
+        }
+    }
+    
+    var accessLevel: String? {
+        switch self {
+        case .location: return "While Using"
+        case .photoLibrary: return "Add Only"
+        case .microphone, .bluetooth: return nil
+        }
+    }
 }
 
 // MARK: - Permissions Manager
