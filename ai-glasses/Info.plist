@@ -4,11 +4,11 @@
 <dict>
 	<!-- Bluetooth permission for glasses connection -->
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Needed to connect to Meta Wearables</string>
+	<string>Bluetooth is required to connect to your Meta Glasses. Without Bluetooth access, this app cannot function.</string>
 	
 	<!-- Microphone permission for audio recording -->
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Needed to record audio from Meta Wearables</string>
+	<string>Microphone is required to talk to AI through this app. Without microphone access, this app cannot function.</string>
 	
 	<!-- Photo Library ADD-ONLY permission for saving photos and videos -->
 	<key>NSPhotoLibraryAddUsageDescription</key>

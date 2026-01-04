@@ -643,8 +643,8 @@ private struct BluetoothPermissionView: View {
                         .multilineTextAlignment(.center)
                     
                     Text(state == .priming
-                         ? "Voice Agent needs Bluetooth to connect to your Meta glasses.\nWithout Bluetooth, the app cannot communicate with your glasses."
-                         : "You've previously denied Bluetooth access.\nTo use Voice Agent with glasses, please enable it in Settings.")
+                         ? "Bluetooth is required to connect to your Meta Glasses.\nWithout Bluetooth, this app cannot function."
+                         : "You've previously denied Bluetooth access.\nBluetooth is required to connect to glasses — without it, the app cannot function.")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -737,8 +737,8 @@ private struct MicrophonePermissionView: View {
                         .multilineTextAlignment(.center)
                     
                     Text(state == .priming
-                         ? "Voice Agent needs microphone access to hear you.\nThis is a voice-first experience — without the microphone, it cannot work."
-                         : "You've previously denied microphone access.\nTo use Voice Agent, please enable it in Settings.")
+                         ? "Microphone is required to talk to AI through this app.\nWithout microphone access, this app cannot function."
+                         : "You've previously denied microphone access.\nMicrophone is required for voice conversations — without it, the app cannot function.")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)

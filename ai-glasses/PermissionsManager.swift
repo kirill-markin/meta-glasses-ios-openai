@@ -70,11 +70,11 @@ enum PermissionType: String, CaseIterable, Identifiable {
         case .location:
             return "AI receives your city and country for context-aware responses like weather, local recommendations, and time zone awareness."
         case .microphone:
-            return "Voice Agent can hear you through the glasses microphone for natural conversations."
+            return "Microphone is required to talk to AI. Voice Agent hears you through the glasses microphone for natural conversations."
         case .photoLibrary:
             return "Photos and videos captured from glasses are saved to your Photo Library. This is ADD-ONLY access — the app cannot see or read any of your existing photos or videos."
         case .bluetooth:
-            return "App can discover and connect to your Meta glasses."
+            return "Bluetooth is required to connect to your Meta Glasses. App discovers and communicates with your glasses."
         }
     }
     
@@ -83,11 +83,11 @@ enum PermissionType: String, CaseIterable, Identifiable {
         case .location:
             return "AI will not know your location. Weather, local info, and time zone context will be unavailable."
         case .microphone:
-            return "Voice Agent cannot hear you. Voice conversations will not work."
+            return "Microphone is required to talk to AI. Without it, this app cannot function."
         case .photoLibrary:
             return "Photos and videos will only be saved within the app, not in your Photo Library. You can still capture and view media in the app."
         case .bluetooth:
-            return "Cannot connect to glasses. The app will not be able to discover or pair with your glasses."
+            return "Bluetooth is required to connect to Meta Glasses. Without it, this app cannot function."
         }
     }
     
