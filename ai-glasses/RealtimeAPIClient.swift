@@ -1114,7 +1114,7 @@ final class RealtimeAPIClient: ObservableObject {
                 
                 // Poll for new photo (with timeout)
                 Task {
-                    let maxWaitTime: TimeInterval = 10.0
+                    let maxWaitTime: TimeInterval = 40.0
                     let pollInterval: TimeInterval = 0.25
                     var elapsed: TimeInterval = 0
                     
