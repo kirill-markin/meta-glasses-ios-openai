@@ -383,8 +383,16 @@ final class RealtimeAPIClient: ObservableObject {
     
     /// Toggle microphone mute state
     func toggleMute() {
+        let wasMuted = isMuted
         isMuted.toggle()
         logger.info("🎤 Microphone \(self.isMuted ? "muted" : "unmuted")")
+        
+        // If muting while user is speaking, commit the buffer so speech gets processed
+        if !wasMuted && isMuted && voiceState == .listening {
+            logger.info("📤 Committing audio buffer on mute (speech in progress)")
+            commitAudioBuffer()
+            voiceState = .processing
+        }
     }
     
     // MARK: - Audio Session Setup
