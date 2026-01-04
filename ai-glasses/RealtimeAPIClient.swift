@@ -918,7 +918,7 @@ final class RealtimeAPIClient: ObservableObject {
                 ],
                 "turn_detection": [
                     "type": "server_vad",
-                    "threshold": 0.5,
+                    "threshold": NSDecimalNumber(string: "0.8"),  // Higher threshold to filter out speaker echo while still detecting direct speech
                     "prefix_padding_ms": 300,
                     "silence_duration_ms": 2000,
                     "create_response": false
