@@ -86,6 +86,12 @@ struct SettingsView: View {
                     } label: {
                         Label("Memories", systemImage: "brain")
                     }
+                    
+                    NavigationLink {
+                        AIToolsListView()
+                    } label: {
+                        Label("AI Tools", systemImage: "wrench.and.screwdriver")
+                    }
                 } header: {
                     Text("AI")
                 }
@@ -303,6 +309,163 @@ private struct MemoryEditorView: View {
         .onAppear {
             key = memoryKey
             value = settingsManager.memories[memoryKey] ?? ""
+        }
+    }
+}
+
+// MARK: - AI Tool Definition
+
+private struct AIToolParameter: Identifiable {
+    let id = UUID()
+    let name: String
+    let type: String
+    let description: String
+    let isRequired: Bool
+}
+
+private struct AIToolDefinition: Identifiable {
+    let id = UUID()
+    let name: String
+    let icon: String
+    let description: String
+    let parameters: [AIToolParameter]
+}
+
+// MARK: - AI Tools List View
+
+private struct AIToolsListView: View {
+    private let tools: [AIToolDefinition] = [
+        AIToolDefinition(
+            name: "take_photo",
+            icon: "camera.fill",
+            description: "Capture a photo from the user's smart glasses camera. Use this when the user asks about what they are seeing, looking at, or wants visual information about their surroundings.",
+            parameters: []
+        ),
+        AIToolDefinition(
+            name: "manage_memory",
+            icon: "brain",
+            description: "Store or update a memory about the user. Use when user shares personal info, preferences, or asks to remember something. Pass empty value to delete a memory.",
+            parameters: [
+                AIToolParameter(
+                    name: "key",
+                    type: "string",
+                    description: "Memory identifier in snake_case (e.g. 'user_name', 'preferred_language', 'favorite_food')",
+                    isRequired: true
+                ),
+                AIToolParameter(
+                    name: "value",
+                    type: "string",
+                    description: "Value to store. Pass empty string to delete the memory.",
+                    isRequired: true
+                )
+            ]
+        ),
+        AIToolDefinition(
+            name: "search_internet",
+            icon: "magnifyingglass",
+            description: "Search the internet for real-time information. Use when user asks about current events, news, weather, prices, sports scores, stock prices, or any question requiring up-to-date information from the web.",
+            parameters: [
+                AIToolParameter(
+                    name: "query",
+                    type: "string",
+                    description: "Search query in natural language, one sentence",
+                    isRequired: true
+                )
+            ]
+        )
+    ]
+    
+    var body: some View {
+        List {
+            Section {
+                ForEach(tools) { tool in
+                    AIToolRow(tool: tool)
+                }
+            } footer: {
+                Text("Want more tools? Please contact the developer of this app.")
+                    .padding(.top, 8)
+            }
+        }
+        .navigationTitle("AI Tools")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+// MARK: - AI Tool Row
+
+private struct AIToolRow: View {
+    let tool: AIToolDefinition
+    @State private var isExpanded: Bool = false
+    
+    var body: some View {
+        DisclosureGroup(isExpanded: $isExpanded) {
+            VStack(alignment: .leading, spacing: 12) {
+                // Description
+                Text(tool.description)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
+                // Parameters
+                if !tool.parameters.isEmpty {
+                    Divider()
+                    
+                    Text("Parameters")
+                        .font(.caption)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                    
+                    ForEach(tool.parameters) { param in
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(spacing: 6) {
+                                Text(param.name)
+                                    .font(.footnote)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.primary)
+                                
+                                Text(param.type)
+                                    .font(.caption2)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.blue.opacity(0.15))
+                                    .foregroundColor(.blue)
+                                    .cornerRadius(4)
+                                
+                                if param.isRequired {
+                                    Text("required")
+                                        .font(.caption2)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(Color.orange.opacity(0.15))
+                                        .foregroundColor(.orange)
+                                        .cornerRadius(4)
+                                }
+                            }
+                            
+                            Text(param.description)
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                } else {
+                    Divider()
+                    
+                    Text("No parameters")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .italic()
+                }
+            }
+            .padding(.vertical, 8)
+        } label: {
+            Label {
+                Text(tool.name)
+                    .font(.body)
+                    .fontWeight(.medium)
+            } icon: {
+                Image(systemName: tool.icon)
+                    .foregroundColor(.accentColor)
+            }
         }
     }
 }
