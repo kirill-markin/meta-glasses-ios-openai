@@ -415,17 +415,10 @@ final class RealtimeAPIClient: ObservableObject {
     }
     
     /// Toggle microphone mute state
+    /// Simple behavior: just stop/resume sending audio, no side effects
     func toggleMute() {
-        let wasMuted = isMuted
         isMuted.toggle()
         logger.info("🎤 Microphone \(self.isMuted ? "muted" : "unmuted")")
-        
-        // If muting while user is speaking, commit the buffer so speech gets processed
-        if !wasMuted && isMuted && voiceState == .listening {
-            logger.info("📤 Committing audio buffer on mute (speech in progress)")
-            commitAudioBuffer()
-            voiceState = .processing
-        }
     }
     
     // MARK: - Audio Session Setup
@@ -674,10 +667,16 @@ final class RealtimeAPIClient: ObservableObject {
     private func sendAudio(pcmData: Data) {
         guard connectionState == .connected else { return }
         
-        // Don't send audio when muted
-        guard !isMuted else { return }
+        // When muted, send silence instead of actual audio
+        // This keeps the audio stream continuous so VAD can properly detect pauses
+        let audioToSend: Data
+        if isMuted {
+            audioToSend = Data(count: pcmData.count) // Zero-filled buffer = silence
+        } else {
+            audioToSend = pcmData
+        }
         
-        let base64Audio = pcmData.base64EncodedString()
+        let base64Audio = audioToSend.base64EncodedString()
         let event: [String: Any] = [
             "type": "input_audio_buffer.append",
             "audio": base64Audio
