@@ -797,7 +797,7 @@ final class RealtimeAPIClient: ObservableObject {
         }
     }
     
-    /// Call gpt-4o-mini for fast classification
+    /// Call fast model (Constants.fastModel) for classification
     private func callFastLLM(prompt: String) async throws -> String {
         let url = URL(string: "https://api.openai.com/v1/chat/completions")!
         var request = URLRequest(url: url)
@@ -807,7 +807,7 @@ final class RealtimeAPIClient: ObservableObject {
         request.timeoutInterval = 3 // Fast timeout - we need quick response
         
         let body: [String: Any] = [
-            "model": "gpt-4o-mini",
+            "model": Constants.fastModel,
             "messages": [
                 ["role": "user", "content": prompt]
             ],

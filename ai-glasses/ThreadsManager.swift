@@ -173,7 +173,7 @@ final class ThreadsManager: ObservableObject {
         }
     }
     
-    /// Generate a concise thread title using gpt-4o-mini
+    /// Generate a concise thread title using fast model
     private func generateAndUpdateThreadTitle(threadId: UUID, messages: [StoredMessage]) async {
         // Build conversation context for the model
         var conversationText = ""
@@ -209,7 +209,7 @@ final class ThreadsManager: ObservableObject {
         logger.info("📝 Updated thread title to: \(cleanTitle)")
     }
     
-    /// Call gpt-4o-mini for quick text generation
+    /// Call fast model (Constants.fastModel) for quick text generation
     private func callGPT4oMini(prompt: String) async -> String? {
         let url = URL(string: "https://api.openai.com/v1/chat/completions")!
         var request = URLRequest(url: url)
@@ -218,7 +218,7 @@ final class ThreadsManager: ObservableObject {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
         let body: [String: Any] = [
-            "model": "gpt-4o-mini",
+            "model": Constants.fastModel,
             "messages": [
                 ["role": "user", "content": prompt]
             ],
