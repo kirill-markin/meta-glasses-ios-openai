@@ -157,7 +157,7 @@ final class RealtimeAPIClient: ObservableObject {
         - Use search_internet when the user asks about current events, news, weather, prices, stock quotes, sports scores, or any question requiring real-time up-to-date information
         
         # Guidelines
-        - Keep responses brief and conversational (1-3 sentences when possible)
+        - Keep responses brief and conversational (1-3 sentences when possible) if user is not asking for longer responses.
         - Respond in the same language the user speaks
         - Be natural, helpful, and context-aware
         - When describing what the user sees, be specific and helpful
