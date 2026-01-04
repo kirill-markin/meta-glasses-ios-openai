@@ -532,7 +532,7 @@ private struct PermissionsView: View {
     @Environment(\.scenePhase) private var scenePhase
     
     private var requiredPermissions: [PermissionType] {
-        PermissionType.allCases.filter { $0.isRequired }
+        [.bluetooth, .microphone]
     }
     
     private var optionalPermissions: [PermissionType] {
