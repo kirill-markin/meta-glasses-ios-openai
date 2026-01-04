@@ -116,17 +116,75 @@ final class RealtimeAPIClient: ObservableObject {
     // Track if we received response.done (separate from actual playback completion)
     private var responseGenerationComplete = false
     
+    // Audio interruption observer for background handling
+    private var interruptionObserver: NSObjectProtocol?
+    
     // MARK: - Initialization
     
     init(apiKey: String) {
         self.apiKey = apiKey
+        setupAudioInterruptionHandling()
     }
     
     deinit {
+        // Remove audio interruption observer
+        if let observer = interruptionObserver {
+            NotificationCenter.default.removeObserver(observer)
+        }
         // Clean up audio engine synchronously
         audioEngine?.inputNode.removeTap(onBus: 0)
         playerNode?.stop()
         audioEngine?.stop()
+    }
+    
+    /// Set up handling for audio session interruptions (calls, other apps, etc.)
+    private func setupAudioInterruptionHandling() {
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            Task { @MainActor in
+                self?.handleAudioInterruption(notification)
+            }
+        }
+    }
+    
+    private func handleAudioInterruption(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let typeValue = userInfo[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else {
+            return
+        }
+        
+        switch type {
+        case .began:
+            logger.warning("⚠️ Audio session interrupted (call, other app, etc.)")
+            // Audio is interrupted - stop our audio processing
+            if voiceState == .speaking {
+                stopPlayback()
+                pendingAudioBufferCount = 0
+            }
+            
+        case .ended:
+            logger.info("✅ Audio session interruption ended")
+            // Check if we should resume
+            if let optionsValue = userInfo[AVAudioSessionInterruptionOptionKey] as? UInt {
+                let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
+                if options.contains(.shouldResume) {
+                    // Reactivate audio session
+                    do {
+                        try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
+                        logger.info("✅ Audio session reactivated after interruption")
+                    } catch {
+                        logger.error("❌ Failed to reactivate audio session: \(error.localizedDescription)")
+                    }
+                }
+            }
+            
+        @unknown default:
+            break
+        }
     }
     
     // MARK: - Public Methods
