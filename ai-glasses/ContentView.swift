@@ -25,27 +25,68 @@ enum AppTab: Int {
     }
 }
 
+// MARK: - Lazy View
+
+/// Wrapper that delays View creation until it's actually displayed
+private struct LazyView<Content: View>: View {
+    let build: () -> Content
+    
+    init(_ build: @autoclosure @escaping () -> Content) {
+        self.build = build
+    }
+    
+    var body: Content {
+        build()
+    }
+}
+
 struct ContentView: View {
     @State private var selectedTab: AppTab = .glasses
     @StateObject private var glassesManager = GlassesManager()
     
     var body: some View {
-        TabView(selection: $selectedTab) {
-            GlassesTab(glassesManager: glassesManager)
-                .tabItem {
-                    Label("Glasses", systemImage: "eyeglasses")
+        Group {
+            if glassesManager.isInitialized {
+                TabView(selection: $selectedTab) {
+                    GlassesTab(glassesManager: glassesManager)
+                        .tabItem {
+                            Label("Glasses", systemImage: "eyeglasses")
+                        }
+                        .tag(AppTab.glasses)
+                    
+                    LazyView(VoiceAgentView(glassesManager: glassesManager))
+                        .tabItem {
+                            Label("Voice Agent", systemImage: "waveform.circle")
+                        }
+                        .tag(AppTab.voiceAgent)
                 }
-                .tag(AppTab.glasses)
+                .onChange(of: selectedTab) { oldValue, newValue in
+                    logger.info("📑 Tab changed: \(oldValue.name) → \(newValue.name)")
+                }
+            } else {
+                LoadingView()
+            }
+        }
+    }
+}
+
+// MARK: - Loading View
+
+private struct LoadingView: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "eyeglasses")
+                .font(.system(size: 60))
+                .foregroundColor(.blue)
             
-            VoiceAgentView(glassesManager: glassesManager)
-                .tabItem {
-                    Label("Voice Agent", systemImage: "waveform.circle")
-                }
-                .tag(AppTab.voiceAgent)
+            Text("Initializing...")
+                .font(.headline)
+                .foregroundColor(.secondary)
+            
+            ProgressView()
         }
-        .onChange(of: selectedTab) { oldValue, newValue in
-            logger.info("📑 Tab changed: \(oldValue.name) → \(newValue.name)")
-        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
     }
 }
 

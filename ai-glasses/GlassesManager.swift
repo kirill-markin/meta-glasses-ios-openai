@@ -172,6 +172,7 @@ final class GlassesManager: ObservableObject {
     
     // MARK: - Published Properties
     
+    @Published private(set) var isInitialized: Bool = false
     @Published private(set) var connectionState: GlassesConnectionState = .disconnected {
         didSet {
             if oldValue != connectionState {
@@ -220,9 +221,20 @@ final class GlassesManager: ObservableObject {
     init() {
         Log.glasses.info("📱 GlassesManager initialized")
         self.wearables = Wearables.shared
-        loadMediaList()
-        setupDevicesListener()
-        setupRegistrationListener()
+        
+        // Defer heavy SDK initialization to allow UI to render first
+        Task {
+            // Small delay so loading screen can appear
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 sec
+            
+            Log.glasses.info("📱 Starting SDK setup...")
+            setupDevicesListener()
+            setupRegistrationListener()
+            await loadMediaListAsync()
+            
+            isInitialized = true
+            Log.glasses.info("📱 GlassesManager ready")
+        }
     }
     
     // MARK: - Public Methods
@@ -896,28 +908,37 @@ final class GlassesManager: ObservableObject {
         }
     }
     
-    private func loadMediaList() {
-        guard FileManager.default.fileExists(atPath: Self.mediaStorageURL.path) else {
-            Log.glasses.info("📂 No saved media list found")
-            return
-        }
+    private func loadMediaListAsync() async {
+        let storageURL = Self.mediaStorageURL
         
-        do {
-            let data = try Data(contentsOf: Self.mediaStorageURL)
-            let storedItems = try JSONDecoder().decode([StoredMediaItem].self, from: data)
-            let loadedItems = storedItems.compactMap { $0.toMediaItem() }
-            let skippedCount = storedItems.count - loadedItems.count
-            
-            capturedMedia = loadedItems
-            Log.glasses.info("📂 Loaded \(loadedItems.count) media items")
-            
-            // Clean up metadata for missing files - they can't be recovered
-            if skippedCount > 0 {
-                Log.glasses.info("🧹 Removing \(skippedCount) orphaned metadata entries (files not found)")
-                saveMediaList()
+        // Perform file I/O and JSON decode in background (heavy operations)
+        let storedItems: [StoredMediaItem]? = await Task.detached(priority: .utility) {
+            guard FileManager.default.fileExists(atPath: storageURL.path) else {
+                Log.glasses.info("📂 No saved media list found")
+                return nil
             }
-        } catch {
-            Log.glasses.error("❌ Failed to load media list: \(error.localizedDescription)")
+            
+            do {
+                let data = try Data(contentsOf: storageURL)
+                return try JSONDecoder().decode([StoredMediaItem].self, from: data)
+            } catch {
+                Log.glasses.error("❌ Failed to load media list: \(error.localizedDescription)")
+                return nil
+            }
+        }.value
+        
+        // Convert to MediaItem on MainActor (lightweight, requires actor isolation)
+        guard let storedItems = storedItems else { return }
+        
+        let loadedItems = storedItems.compactMap { $0.toMediaItem() }
+        let skippedCount = storedItems.count - loadedItems.count
+        
+        capturedMedia = loadedItems
+        Log.glasses.info("📂 Loaded \(loadedItems.count) media items")
+        
+        if skippedCount > 0 {
+            Log.glasses.info("🧹 Removing \(skippedCount) orphaned metadata entries (files not found)")
+            saveMediaList()
         }
     }
 }
