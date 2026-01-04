@@ -21,6 +21,7 @@ final class LocationManager: NSObject, ObservableObject {
     
     private let locationManager = CLLocationManager()
     private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "ai-glasses", category: "Location")
+    private var lastGeocodedLocation: CLLocation?
     
     private override init() {
         super.init()
@@ -86,7 +87,14 @@ extension LocationManager: CLLocationManagerDelegate {
         guard let location = locations.last else { return }
         
         Task { @MainActor in
+            // Skip if location hasn't changed significantly (within 100m)
+            if let lastLocation = lastGeocodedLocation,
+               location.distance(from: lastLocation) < 100 {
+                return
+            }
+            
             logger.debug("Location updated: \(location.coordinate.latitude), \(location.coordinate.longitude)")
+            lastGeocodedLocation = location
             geocodeLocation(location)
         }
     }
