@@ -94,6 +94,9 @@ final class RealtimeAPIClient: ObservableObject {
     private var pendingAudioData = Data()
     private var isPlaying = false
     
+    // Saved playback format to ensure consistent buffer scheduling
+    private var playbackFormat: AVAudioFormat?
+    
     // Track pending user message to ensure correct ordering
     private var pendingUserMessageId: UUID?
     
@@ -250,6 +253,8 @@ final class RealtimeAPIClient: ObservableObject {
         
         // Connect player to output for playback
         let outputFormat = audioEngine.outputNode.inputFormat(forBus: 0)
+        playbackFormat = outputFormat
+        logger.info("📊 Output format: \(outputFormat.sampleRate) Hz, \(outputFormat.channelCount) ch")
         audioEngine.connect(playerNode, to: audioEngine.mainMixerNode, format: outputFormat)
         
         // Create converter for input resampling
@@ -275,6 +280,7 @@ final class RealtimeAPIClient: ObservableObject {
         audioEngine?.stop()
         audioEngine = nil
         playerNode = nil
+        playbackFormat = nil
         
         try? audioSession.setActive(false, options: .notifyOthersOnDeactivation)
         
@@ -336,67 +342,74 @@ final class RealtimeAPIClient: ObservableObject {
     // MARK: - Audio Playback
     
     private func playAudioData(_ data: Data) {
-        guard let audioEngine = audioEngine, let playerNode = playerNode else {
-            logger.warning("⚠️ Cannot play audio: engine not running")
+        guard audioEngine != nil,
+              let playerNode = playerNode,
+              let outputFormat = playbackFormat else {
+            logger.warning("⚠️ Cannot play audio: engine not running or no playback format")
             return
         }
         
-        // Create buffer from PCM16 data
+        // Create buffer from PCM16 data in OpenAI format (24kHz, mono)
         let frameCount = data.count / 2 // 2 bytes per sample
         
-        guard let format = AVAudioFormat(
+        guard let openAIFormat = AVAudioFormat(
             commonFormat: .pcmFormatFloat32,
             sampleRate: openAISampleRate,
             channels: openAIChannels,
             interleaved: false
         ),
-        let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frameCount)) else {
-            logger.error("❌ Failed to create playback buffer")
+        let sourceBuffer = AVAudioPCMBuffer(pcmFormat: openAIFormat, frameCapacity: AVAudioFrameCount(frameCount)) else {
+            logger.error("❌ Failed to create source buffer")
             return
         }
         
-        buffer.frameLength = AVAudioFrameCount(frameCount)
+        sourceBuffer.frameLength = AVAudioFrameCount(frameCount)
         
         // Convert Int16 to Float32
         data.withUnsafeBytes { rawBuffer in
             let int16Ptr = rawBuffer.bindMemory(to: Int16.self)
-            guard let floatData = buffer.floatChannelData?[0] else { return }
+            guard let floatData = sourceBuffer.floatChannelData?[0] else { return }
             
             for i in 0..<frameCount {
                 floatData[i] = Float(int16Ptr[i]) / Float(Int16.max)
             }
         }
         
-        // Convert sample rate if needed
-        let outputFormat = audioEngine.outputNode.inputFormat(forBus: 0)
+        // Always convert to output format (handles both sample rate and channel count differences)
+        let needsConversion = openAIFormat.sampleRate != outputFormat.sampleRate ||
+                              openAIFormat.channelCount != outputFormat.channelCount
         
-        if format.sampleRate != outputFormat.sampleRate {
-            guard let converter = AVAudioConverter(from: format, to: outputFormat) else {
+        if needsConversion {
+            guard let converter = AVAudioConverter(from: openAIFormat, to: outputFormat) else {
                 logger.error("❌ Failed to create playback converter")
                 return
             }
             
             let outputFrameCount = AVAudioFrameCount(
-                Double(frameCount) * outputFormat.sampleRate / format.sampleRate
+                Double(frameCount) * outputFormat.sampleRate / openAIFormat.sampleRate
             )
             
             guard let outputBuffer = AVAudioPCMBuffer(pcmFormat: outputFormat, frameCapacity: outputFrameCount) else {
+                logger.error("❌ Failed to create output buffer")
                 return
             }
             
             var error: NSError?
             let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
                 outStatus.pointee = .haveData
-                return buffer
+                return sourceBuffer
             }
             
             converter.convert(to: outputBuffer, error: &error, withInputFrom: inputBlock)
             
-            if error == nil {
-                playerNode.scheduleBuffer(outputBuffer)
+            if let error = error {
+                logger.error("❌ Conversion error: \(error.localizedDescription)")
+                return
             }
+            
+            playerNode.scheduleBuffer(outputBuffer)
         } else {
-            playerNode.scheduleBuffer(buffer)
+            playerNode.scheduleBuffer(sourceBuffer)
         }
     }
     
