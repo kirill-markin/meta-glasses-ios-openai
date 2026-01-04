@@ -298,8 +298,8 @@ final class RealtimeAPIClient: ObservableObject {
             return
         }
         
-        // Request location permission if needed (for context in prompt)
-        LocationManager.shared.requestPermissionIfNeeded()
+        // Request location update if permission already granted (don't trigger system dialog)
+        LocationManager.shared.requestLocation()
         
         connectionState = .connecting
         logger.info("Connecting to Realtime API...")

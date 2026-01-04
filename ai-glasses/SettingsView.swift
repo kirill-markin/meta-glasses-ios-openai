@@ -594,6 +594,7 @@ private struct PermissionDetailView: View {
     @ObservedObject private var permissionsManager = PermissionsManager.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var showPhotoLibraryExplanation: Bool = false
+    @State private var showLocationExplanation: Bool = false
     
     private var status: PermissionStatus {
         permissionsManager.status(for: permission)
@@ -708,12 +709,21 @@ private struct PermissionDetailView: View {
         } message: {
             Text("This app requests ADD-ONLY access to your Photo Library.\n\nThe app will NOT be able to see or access any existing photos or videos. It also won't see photos or videos created by other apps.\n\nThis permission is only needed to save photos and videos captured from your glasses.")
         }
+        .alert("Location Access", isPresented: $showLocationExplanation) {
+            Button("Continue") {
+                permissionsManager.requestLocation()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("If you allow location access, AI will receive your city and country to provide context-aware responses (weather, local recommendations, time zone).\n\nIf you don't allow it, everything will work the same — AI just won't know your location unless you tell it yourself.")
+        }
     }
     
     private func requestPermission() {
         switch permission {
         case .location:
-            permissionsManager.requestLocation()
+            // Show explanation alert first
+            showLocationExplanation = true
         case .microphone:
             permissionsManager.requestMicrophone()
         case .photoLibrary:
