@@ -189,6 +189,11 @@ final class GlassesManager: ObservableObject {
     @Published private(set) var audioRecordingState: AudioRecordingState = .idle
     @Published private(set) var currentAudioInput: String = "No input"
     
+    /// Returns 1 if registered but no devices available, otherwise 0
+    var glassesErrorCount: Int {
+        (isRegistered && availableDevices.isEmpty) ? 1 : 0
+    }
+    
     // MARK: - Private Properties
     
     private let wearables: WearablesInterface

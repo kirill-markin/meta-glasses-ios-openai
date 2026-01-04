@@ -72,9 +72,10 @@ struct ContentView: View {
                             Label("Settings", systemImage: "gearshape")
                         }
                         .tag(AppTab.settings)
-                        .badge(permissionsManager.missingRequiredPermissionsCount > 0
-                               ? permissionsManager.missingRequiredPermissionsCount
-                               : 0)
+                        .badge({
+                            let total = permissionsManager.missingRequiredPermissionsCount + glassesManager.glassesErrorCount
+                            return total > 0 ? total : 0
+                        }())
                 }
                 .onChange(of: selectedTab) { oldValue, newValue in
                     logger.info("📑 Tab changed: \(oldValue.name) → \(newValue.name)")
@@ -256,7 +257,7 @@ private struct StatusSection: View {
                 
                 Label("\(deviceCount) device(s)", systemImage: "eyeglasses")
                     .font(.caption)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(deviceCount == 0 ? .red : .secondary)
             }
         }
         .padding()

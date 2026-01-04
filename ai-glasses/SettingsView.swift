@@ -151,7 +151,19 @@ struct SettingsView: View {
                     NavigationLink {
                         LazyView(GlassesTab(glassesManager: glassesManager))
                     } label: {
-                        Label("Glasses", systemImage: "eyeglasses")
+                        HStack {
+                            Label("Glasses", systemImage: "eyeglasses")
+                            Spacer()
+                            if glassesManager.glassesErrorCount > 0 {
+                                Text("\(glassesManager.glassesErrorCount)")
+                                    .font(.caption2.bold())
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.red)
+                                    .clipShape(Capsule())
+                            }
+                        }
                     }
                 } header: {
                     Text("Hardware")
