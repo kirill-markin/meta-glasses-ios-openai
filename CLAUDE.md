@@ -10,13 +10,27 @@ iOS app for experimenting with Meta Ray-Ban smart glasses.
 
 ## SDK Documentation
 
+### Meta Wearables
 - GitHub: https://github.com/facebook/meta-wearables-dat-ios
 - Developer Center: https://developer.meta.com/docs/wearables
 
+### OpenAI Realtime API
+- Docs: https://platform.openai.com/docs/guides/realtime
+- WebSocket endpoint: `wss://api.openai.com/v1/realtime?model=gpt-realtime`
+- Audio format: PCM16, 24kHz, mono
+
 ## Architecture
 
+### Glasses Tab
 - `GlassesManager` - singleton for glasses connection and streaming
-- `ContentView` - main UI with video preview and controls
+- `ContentView` - TabView with Glasses and Voice Agent tabs
+- `AudioManager` - Bluetooth HFP audio session for glasses mic
+- `VideoRecorder` - records video frames with audio to file
+
+### Voice Agent Tab
+- `RealtimeAPIClient` - WebSocket client for OpenAI Realtime API with audio capture/playback
+- `VoiceAgentView` - UI for voice conversations with OpenAI
+- `Config` - API keys (gitignored)
 
 ## Key SDK Classes
 
