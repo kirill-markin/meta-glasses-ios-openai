@@ -617,15 +617,11 @@ private struct ControlBar: View {
         VStack(spacing: 12) {
             Divider()
             
-            // Smart detection hint
+            // Smart detection hint (only when not muted)
             if !isMuted && (voiceState == .idle || voiceState == .listening) {
                 Text("AI will detect when you're ready for a response")
                     .font(.caption)
                     .foregroundColor(.secondary)
-            } else if isMuted {
-                Text("Microphone is muted")
-                    .font(.caption)
-                    .foregroundColor(.red)
             }
             
             // Voice controls
@@ -633,7 +629,7 @@ private struct ControlBar: View {
                 // Disconnect button
                 Button(action: onDisconnect) {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.title2)
+                        .font(.system(size: 44))
                         .foregroundColor(.red)
                 }
                 
@@ -651,9 +647,9 @@ private struct ControlBar: View {
                 
                 // Force response button (fallback if user forgot trigger phrase)
                 Button(action: onForceResponse) {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.title2)
-                        .foregroundColor(.green)
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.system(size: 44))
+                        .foregroundColor(.blue)
                 }
                 .disabled(voiceState == .speaking || voiceState == .processing)
                 .opacity(voiceState == .speaking || voiceState == .processing ? 0.4 : 1.0)
@@ -695,6 +691,15 @@ private struct MuteButton: View {
                         .fill(Color.blue.opacity(0.3))
                         .frame(width: 80 + CGFloat(audioLevel * 30), height: 80 + CGFloat(audioLevel * 30))
                         .animation(.easeInOut(duration: 0.1), value: audioLevel)
+                }
+            }
+            // Muted indicator text (positioned within the fixed frame)
+            .overlay(alignment: .bottom) {
+                if isMuted {
+                    Text("Muted")
+                        .font(.caption2.bold())
+                        .foregroundColor(.red)
+                        .offset(y: -4)
                 }
             }
         }
