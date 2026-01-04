@@ -139,6 +139,7 @@ struct ThreadDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showDeleteConfirmation = false
     @State private var copiedMessageId: UUID?
+    @State private var showFullTitle = false
     
     private var thread: ConversationThread? {
         threadsManager.thread(id: threadId)
@@ -195,9 +196,24 @@ struct ThreadDetailView: View {
                     .foregroundColor(.secondary)
             }
         }
-        .navigationTitle(thread?.title ?? "Thread")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Button(action: {
+                    showFullTitle = true
+                }) {
+                    Text(thread?.title ?? "Thread")
+                        .font(.headline)
+                        .lineLimit(1)
+                        .foregroundColor(.primary)
+                }
+                .popover(isPresented: $showFullTitle) {
+                    Text(thread?.title ?? "Thread")
+                        .font(.body)
+                        .padding()
+                        .presentationCompactAdaptation(.popover)
+                }
+            }
             ToolbarItem(placement: .navigationBarTrailing) {
                 Menu {
                     Button(role: .destructive, action: {
