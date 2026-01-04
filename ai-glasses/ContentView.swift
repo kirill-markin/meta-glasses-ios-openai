@@ -88,14 +88,14 @@ private struct LoadingView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
-        .background(KeyboardPreloader())
+        .background(SystemPreloader())
     }
 }
 
-// MARK: - Keyboard Preloader
+// MARK: - System Preloader
 
-/// Preloads the keyboard system during loading screen to avoid delay on first text input
-private struct KeyboardPreloader: UIViewRepresentable {
+/// Preloads various systems during loading screen to avoid delays on first use
+private struct SystemPreloader: UIViewRepresentable {
     func makeUIView(context: Context) -> UIView {
         let container = UIView(frame: .zero)
         container.isHidden = true
@@ -105,11 +105,22 @@ private struct KeyboardPreloader: UIViewRepresentable {
         textField.isHidden = true
         container.addSubview(textField)
         
-        // Briefly become first responder to preload keyboard, then resign
+        // Preload systems in background
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            // 1. Preload keyboard
             textField.becomeFirstResponder()
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 textField.resignFirstResponder()
+            }
+            
+            // 2. Preload SettingsManager (triggers file load)
+            Task { @MainActor in
+                _ = SettingsManager.shared.memories
+            }
+            
+            // 3. Preload SoundManager (warm up audio engine with silent tone)
+            Task { @MainActor in
+                _ = SoundManager.shared
             }
         }
         
