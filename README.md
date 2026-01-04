@@ -87,7 +87,7 @@ Open `meta-glasses-ios-openai.xcodeproj` in Xcode → Run on physical iOS device
 
 ## Tech Stack
 
-- Swift 5 / SwiftUI
+- Swift / SwiftUI
 - [Meta Wearables SDK](https://github.com/facebook/meta-wearables-dat-ios) (MWDATCore, MWDATCamera)
 - [OpenAI Realtime API](https://platform.openai.com/docs/guides/realtime) (WebSocket)
 - Bluetooth HFP for glasses audio
