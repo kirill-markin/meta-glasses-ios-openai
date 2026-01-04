@@ -247,8 +247,10 @@ final class PermissionsManager: NSObject, ObservableObject {
     
     // MARK: - Bluetooth
     
-    private func refreshBluetooth() {
-        // Need to check CBCentralManager authorization
+    private var bluetoothPermissionCompletion: ((PermissionStatus) -> Void)?
+    
+    func refreshBluetooth() {
+        // Check CBCentralManager authorization without triggering permission dialog
         let authorization = CBCentralManager.authorization
         bluetoothStatus = mapCBManagerAuthorization(authorization)
         logger.debug("Bluetooth status: \(self.bluetoothStatus.rawValue)")
@@ -260,6 +262,24 @@ final class PermissionsManager: NSObject, ObservableObject {
             centralManager = CBCentralManager(delegate: self, queue: nil)
         }
         // Status will update via delegate
+    }
+    
+    /// Request Bluetooth permission with completion callback
+    /// - Parameter completion: Called when permission status is determined
+    func requestBluetooth(completion: @escaping (PermissionStatus) -> Void) {
+        // If already determined, return immediately
+        if bluetoothStatus != .notDetermined {
+            completion(bluetoothStatus)
+            return
+        }
+        
+        // Store completion for delegate callback
+        bluetoothPermissionCompletion = completion
+        
+        // Creating CBCentralManager triggers the permission dialog
+        if centralManager == nil {
+            centralManager = CBCentralManager(delegate: self, queue: nil)
+        }
     }
     
     private func mapCBManagerAuthorization(_ authorization: CBManagerAuthorization) -> PermissionStatus {
@@ -293,6 +313,12 @@ extension PermissionsManager: CBCentralManagerDelegate {
     nonisolated func centralManagerDidUpdateState(_ central: CBCentralManager) {
         Task { @MainActor in
             refreshBluetooth()
+            
+            // Call completion handler if waiting for permission result
+            if let completion = bluetoothPermissionCompletion {
+                bluetoothPermissionCompletion = nil
+                completion(bluetoothStatus)
+            }
         }
     }
 }
