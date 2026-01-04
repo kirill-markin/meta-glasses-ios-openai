@@ -126,6 +126,9 @@ final class RealtimeAPIClient: ObservableObject {
     private var pendingFunctionCallId: String?
     private var pendingFunctionName: String?
     
+    // Track pending tool message for updating with result
+    private var pendingToolMessageId: UUID?
+    
     // Settings observer for live updates
     private var settingsSubscription: AnyCancellable?
     
@@ -763,6 +766,27 @@ final class RealtimeAPIClient: ObservableObject {
         return content.trimmingCharacters(in: .whitespacesAndNewlines)
     }
     
+    /// Get user-friendly display text for tool call
+    private func toolCallDisplayText(name: String) -> String {
+        switch name {
+        case "take_photo":
+            return "📸 Capturing photo..."
+        case "manage_memory":
+            return "🧠 Managing memory..."
+        default:
+            return "🔧 \(name)..."
+        }
+    }
+    
+    /// Update the pending tool message with result text
+    private func updatePendingToolMessage(text: String) {
+        if let messageId = pendingToolMessageId,
+           let index = messages.firstIndex(where: { $0.id == messageId }) {
+            messages[index].text = text
+        }
+        pendingToolMessageId = nil
+    }
+    
     /// Handle function calls from the assistant
     private func handleFunctionCall(name: String, callId: String, arguments: String) async {
         logger.info("🔧 Handling function call: \(name)")
@@ -787,6 +811,7 @@ final class RealtimeAPIClient: ObservableObject {
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let key = json["key"] as? String else {
             logger.error("❌ Failed to parse manage_memory arguments")
+            updatePendingToolMessage(text: "🧠 Memory error")
             sendToolResult(callId: callId, result: "Error: Invalid arguments")
             return
         }
@@ -800,24 +825,30 @@ final class RealtimeAPIClient: ObservableObject {
         let previousValue = SettingsManager.shared.memories[trimmedKey]
         SettingsManager.shared.manageMemory(key: trimmedKey, value: trimmedValue)
         
-        // Determine what happened and send appropriate result
+        // Determine what happened and update chat message
+        let displayMessage: String
         let resultMessage: String
         if trimmedValue.isEmpty {
             if previousValue != nil {
+                displayMessage = "🧠 Deleted: \(trimmedKey)"
                 resultMessage = "Memory '\(trimmedKey)' deleted."
                 logger.info("🧠 Deleted memory: \(trimmedKey)")
             } else {
+                displayMessage = "🧠 Not found: \(trimmedKey)"
                 resultMessage = "Memory '\(trimmedKey)' was not found."
                 logger.info("🧠 Memory not found for deletion: \(trimmedKey)")
             }
         } else if previousValue != nil {
+            displayMessage = "🧠 Updated: \(trimmedKey)"
             resultMessage = "Memory '\(trimmedKey)' updated to: \(trimmedValue)"
             logger.info("🧠 Updated memory: \(trimmedKey) = \(trimmedValue)")
         } else {
+            displayMessage = "🧠 Saved: \(trimmedKey)"
             resultMessage = "Memory '\(trimmedKey)' saved: \(trimmedValue)"
             logger.info("🧠 Added memory: \(trimmedKey) = \(trimmedValue)")
         }
         
+        updatePendingToolMessage(text: displayMessage)
         sendToolResult(callId: callId, result: resultMessage)
     }
     
@@ -825,19 +856,14 @@ final class RealtimeAPIClient: ObservableObject {
     private func handleTakePhotoTool(callId: String) async {
         logger.info("📸 Taking photo for assistant...")
         
-        // Add a message to show we're capturing
-        messages.append(ChatMessage(isUser: false, text: "📸 Capturing photo..."))
-        
         do {
             // Capture photo using GlassesManager
             let photoData = try await capturePhotoFromGlasses()
             
             logger.info("📸 Photo captured, sending directly to Realtime API (\(photoData.count) bytes)")
             
-            // Update the capture message with success
-            if let lastIndex = messages.lastIndex(where: { $0.text == "📸 Capturing photo..." }) {
-                messages[lastIndex].text = "📸 Photo captured"
-            }
+            // Update the tool message with success
+            updatePendingToolMessage(text: "📸 Photo captured")
             
             // Send the image directly to Realtime API as a conversation item
             sendImageToConversation(imageData: photoData)
@@ -848,10 +874,8 @@ final class RealtimeAPIClient: ObservableObject {
         } catch {
             logger.error("❌ Photo capture failed: \(error.localizedDescription)")
             
-            // Update the capture message with error
-            if let lastIndex = messages.lastIndex(where: { $0.text == "📸 Capturing photo..." }) {
-                messages[lastIndex].text = "📸 Photo capture failed"
-            }
+            // Update the tool message with error
+            updatePendingToolMessage(text: "📸 Photo capture failed")
             
             sendToolResult(callId: callId, result: "Failed to capture photo: \(error.localizedDescription)")
         }
@@ -1252,6 +1276,11 @@ final class RealtimeAPIClient: ObservableObject {
             SoundManager.shared.playToolCallSound()
             if let callId = json["call_id"] as? String,
                let name = json["name"] as? String {
+                // Add message to chat showing tool call
+                let toolMessage = ChatMessage(isUser: false, text: toolCallDisplayText(name: name))
+                messages.append(toolMessage)
+                pendingToolMessageId = toolMessage.id
+                
                 Task {
                     await handleFunctionCall(name: name, callId: callId, arguments: json["arguments"] as? String ?? "{}")
                 }
