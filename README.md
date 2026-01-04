@@ -2,7 +2,7 @@
 
 ![Meta Glasses AI Screenshots](docs/screenshots.png)
 
-Voice AI assistant for **Meta Ray-Ban smart glasses** powered by **OpenAI Realtime API**.
+Voice AI assistant for **Meta smart glasses** powered by **OpenAI Realtime API**.
 
 Talk hands-free through your glasses. The AI hears you, sees what you see, and responds in natural voice.
 
@@ -64,10 +64,12 @@ Open `meta-glasses-ios-openai.xcodeproj` in Xcode → Run on physical iOS device
 | What | Where to get |
 |------|--------------|
 | Physical iOS device | — |
-| Meta Ray-Ban smart glasses | Paired via Meta View app |
+| Meta smart glasses | Paired via Meta AI app |
 | Meta App ID | [developer.meta.com](https://developer.meta.com) |
 | OpenAI API key | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
 | Perplexity API key | [perplexity.ai/settings/api](https://www.perplexity.ai/settings/api) |
+
+> ⚠️ **Important:** Enable **Developer Mode** on your glasses before using the app. See [Meta Wearables Setup Guide](https://wearables.developer.meta.com/docs/getting-started-toolkit) for instructions.
 
 ## Tech Stack
 
