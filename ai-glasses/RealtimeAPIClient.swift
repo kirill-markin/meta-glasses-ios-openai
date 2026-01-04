@@ -72,6 +72,7 @@ final class RealtimeAPIClient: ObservableObject {
     @Published private(set) var assistantTranscript: String = ""
     @Published private(set) var audioLevel: Float = 0.0
     @Published private(set) var messages: [ChatMessage] = []
+    @Published private(set) var isMuted: Bool = false
     
     // MARK: - Private Properties
     
@@ -314,6 +315,7 @@ final class RealtimeAPIClient: ObservableObject {
         pendingUserMessageId = nil
         pendingAudioBufferCount = 0
         responseGenerationComplete = false
+        isMuted = false
         
         // Also disconnect from glasses
         if glassesManager.connectionState.isConnected {
@@ -377,6 +379,12 @@ final class RealtimeAPIClient: ObservableObject {
         requestResponse()
         
         voiceState = .processing
+    }
+    
+    /// Toggle microphone mute state
+    func toggleMute() {
+        isMuted.toggle()
+        logger.info("🎤 Microphone \(self.isMuted ? "muted" : "unmuted")")
     }
     
     // MARK: - Audio Session Setup
@@ -624,6 +632,9 @@ final class RealtimeAPIClient: ObservableObject {
     
     private func sendAudio(pcmData: Data) {
         guard connectionState == .connected else { return }
+        
+        // Don't send audio when muted
+        guard !isMuted else { return }
         
         let base64Audio = pcmData.base64EncodedString()
         let event: [String: Any] = [

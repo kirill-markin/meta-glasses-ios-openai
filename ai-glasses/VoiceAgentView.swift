@@ -33,13 +33,9 @@ struct VoiceAgentView: View {
                             logger.info("🔌 Disconnect button tapped")
                             client.disconnect()
                         },
-                        onStartListening: {
-                            logger.info("🎤 Start listening tapped")
-                            client.startListening()
-                        },
-                        onStopListening: {
-                            logger.info("🎤 Stop listening tapped")
-                            client.stopListening()
+                        onToggleMute: {
+                            logger.info("🎤 Toggle mute tapped")
+                            client.toggleMute()
                         },
                         onForceResponse: {
                             logger.info("🔘 Force response tapped")
@@ -169,8 +165,7 @@ private struct WelcomeView: View {
 private struct ConnectedView: View {
     @ObservedObject var client: RealtimeAPIClient
     let onDisconnect: () -> Void
-    let onStartListening: () -> Void
-    let onStopListening: () -> Void
+    let onToggleMute: () -> Void
     let onForceResponse: () -> Void
     
     var body: some View {
@@ -180,7 +175,8 @@ private struct ConnectedView: View {
                     // Session status (compact)
                     SessionStatusBar(
                         isSessionConfigured: client.isSessionConfigured,
-                        voiceState: client.voiceState
+                        voiceState: client.voiceState,
+                        isMuted: client.isMuted
                     )
                     
                     // Transcript area
@@ -198,9 +194,9 @@ private struct ConnectedView: View {
             ControlBar(
                 voiceState: client.voiceState,
                 audioLevel: client.audioLevel,
+                isMuted: client.isMuted,
                 onDisconnect: onDisconnect,
-                onStartListening: onStartListening,
-                onStopListening: onStopListening,
+                onToggleMute: onToggleMute,
                 onForceResponse: onForceResponse
             )
         }
@@ -212,6 +208,7 @@ private struct ConnectedView: View {
 private struct SessionStatusBar: View {
     let isSessionConfigured: Bool
     let voiceState: VoiceState
+    let isMuted: Bool
     
     var body: some View {
         HStack(spacing: 12) {
@@ -227,6 +224,21 @@ private struct SessionStatusBar: View {
             }
             
             Spacer()
+            
+            // Muted indicator
+            if isMuted {
+                HStack(spacing: 4) {
+                    Image(systemName: "mic.slash.fill")
+                        .font(.caption)
+                    Text("Muted")
+                        .font(.caption.bold())
+                }
+                .foregroundColor(.red)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Color.red.opacity(0.15))
+                .cornerRadius(8)
+            }
             
             // Voice state badge
             Text(voiceStateText)
@@ -282,7 +294,7 @@ private struct TranscriptCard: View {
                         Image(systemName: "waveform")
                             .font(.largeTitle)
                             .foregroundColor(.secondary)
-                        Text("Tap the microphone to start talking")
+                        Text("Start speaking, I'm listening...")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
@@ -367,9 +379,9 @@ private struct MessageBubble: View {
 private struct ControlBar: View {
     let voiceState: VoiceState
     let audioLevel: Float
+    let isMuted: Bool
     let onDisconnect: () -> Void
-    let onStartListening: () -> Void
-    let onStopListening: () -> Void
+    let onToggleMute: () -> Void
     let onForceResponse: () -> Void
     
     var body: some View {
@@ -377,10 +389,14 @@ private struct ControlBar: View {
             Divider()
             
             // Smart detection hint
-            if voiceState == .idle || voiceState == .listening {
+            if !isMuted && (voiceState == .idle || voiceState == .listening) {
                 Text("AI will detect when you're ready for a response")
                     .font(.caption)
                     .foregroundColor(.secondary)
+            } else if isMuted {
+                Text("Microphone is muted")
+                    .font(.caption)
+                    .foregroundColor(.red)
             }
             
             // Voice controls
@@ -394,12 +410,12 @@ private struct ControlBar: View {
                 
                 Spacer()
                 
-                // Microphone button
-                MicrophoneButton(
+                // Mute/Unmute button
+                MuteButton(
+                    isMuted: isMuted,
                     voiceState: voiceState,
                     audioLevel: audioLevel,
-                    onStartListening: onStartListening,
-                    onStopListening: onStopListening
+                    onToggleMute: onToggleMute
                 )
                 
                 Spacer()
@@ -419,29 +435,21 @@ private struct ControlBar: View {
     }
 }
 
-// MARK: - Microphone Button
+// MARK: - Mute Button
 
-private struct MicrophoneButton: View {
+private struct MuteButton: View {
+    let isMuted: Bool
     let voiceState: VoiceState
     let audioLevel: Float
-    let onStartListening: () -> Void
-    let onStopListening: () -> Void
-    
-    @State private var isPulsing = false
+    let onToggleMute: () -> Void
     
     var body: some View {
-        Button(action: {
-            if voiceState == .idle {
-                onStartListening()
-            } else if voiceState == .listening {
-                onStopListening()
-            }
-        }) {
+        Button(action: onToggleMute) {
             ZStack {
-                // Pulsing background when listening
-                if voiceState == .listening {
+                // Pulsing background when listening and not muted
+                if voiceState == .listening && !isMuted {
                     Circle()
-                        .fill(Color.red.opacity(0.3))
+                        .fill(Color.blue.opacity(0.3))
                         .frame(width: 80 + CGFloat(audioLevel * 30), height: 80 + CGFloat(audioLevel * 30))
                         .animation(.easeInOut(duration: 0.1), value: audioLevel)
                 }
@@ -453,30 +461,22 @@ private struct MicrophoneButton: View {
                     .shadow(color: buttonColor.opacity(0.4), radius: 8, x: 0, y: 4)
                 
                 // Icon
-                Image(systemName: buttonIcon)
+                Image(systemName: isMuted ? "mic.slash.fill" : "mic.fill")
                     .font(.title)
                     .foregroundColor(.white)
             }
         }
-        .disabled(voiceState == .processing || voiceState == .speaking)
-        .opacity(voiceState == .processing || voiceState == .speaking ? 0.6 : 1.0)
     }
     
     private var buttonColor: Color {
+        if isMuted {
+            return .gray
+        }
         switch voiceState {
         case .idle: return .blue
-        case .listening: return .red
+        case .listening: return .blue
         case .processing: return .orange
         case .speaking: return .purple
-        }
-    }
-    
-    private var buttonIcon: String {
-        switch voiceState {
-        case .idle: return "mic.fill"
-        case .listening: return "stop.fill"
-        case .processing: return "ellipsis"
-        case .speaking: return "speaker.wave.2.fill"
         }
     }
 }
