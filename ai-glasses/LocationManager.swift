@@ -109,10 +109,7 @@ extension LocationManager: CLLocationManagerDelegate {
         Task { @MainActor in
             authorizationStatus = manager.authorizationStatus
             logger.info("Location authorization changed: \(String(describing: self.authorizationStatus.rawValue))")
-            
-            if authorizationStatus == .authorizedWhenInUse || authorizationStatus == .authorizedAlways {
-                requestLocation()
-            }
+            // Location is requested on-demand when starting a discussion, not at app launch
         }
     }
 }
