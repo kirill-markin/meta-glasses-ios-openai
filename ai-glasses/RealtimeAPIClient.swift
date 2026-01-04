@@ -708,10 +708,55 @@ final class RealtimeAPIClient: ObservableObject {
         switch name {
         case "take_photo":
             await handleTakePhotoTool(callId: callId)
+        case "manage_memory":
+            handleManageMemoryTool(callId: callId, arguments: arguments)
         default:
             logger.warning("⚠️ Unknown function: \(name)")
             sendToolResult(callId: callId, result: "Error: Unknown function '\(name)'")
         }
+    }
+    
+    /// Handle the manage_memory tool call
+    private func handleManageMemoryTool(callId: String, arguments: String) {
+        logger.info("🧠 Managing memory...")
+        
+        // Parse arguments
+        guard let data = arguments.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let key = json["key"] as? String else {
+            logger.error("❌ Failed to parse manage_memory arguments")
+            sendToolResult(callId: callId, result: "Error: Invalid arguments")
+            return
+        }
+        
+        let value = json["value"] as? String ?? ""
+        
+        // Perform the memory operation
+        let trimmedKey = key.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedValue = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        
+        let previousValue = SettingsManager.shared.memories[trimmedKey]
+        SettingsManager.shared.manageMemory(key: trimmedKey, value: trimmedValue)
+        
+        // Determine what happened and send appropriate result
+        let resultMessage: String
+        if trimmedValue.isEmpty {
+            if previousValue != nil {
+                resultMessage = "Memory '\(trimmedKey)' deleted."
+                logger.info("🧠 Deleted memory: \(trimmedKey)")
+            } else {
+                resultMessage = "Memory '\(trimmedKey)' was not found."
+                logger.info("🧠 Memory not found for deletion: \(trimmedKey)")
+            }
+        } else if previousValue != nil {
+            resultMessage = "Memory '\(trimmedKey)' updated to: \(trimmedValue)"
+            logger.info("🧠 Updated memory: \(trimmedKey) = \(trimmedValue)")
+        } else {
+            resultMessage = "Memory '\(trimmedKey)' saved: \(trimmedValue)"
+            logger.info("🧠 Added memory: \(trimmedKey) = \(trimmedValue)")
+        }
+        
+        sendToolResult(callId: callId, result: resultMessage)
     }
     
     /// Handle the take_photo tool call
@@ -873,7 +918,7 @@ final class RealtimeAPIClient: ObservableObject {
     private func configureSession() async {
         logger.info("Configuring session...")
         
-        let systemInstructions = """
+        let baseInstructions = """
             You are a helpful voice assistant integrated into Meta Ray-Ban smart glasses. 
             
             # Context
@@ -886,6 +931,8 @@ final class RealtimeAPIClient: ObservableObject {
             - You have access to the glasses camera via the take_photo tool
             - When the user asks what they're looking at, seeing, or wants visual information about their surroundings, use the take_photo tool
             - The tool will capture a photo and provide you with a description of what the camera sees
+            - You can store and manage memories about the user via the manage_memory tool
+            - Use manage_memory when the user shares personal info, preferences, or asks you to remember something
             
             # Guidelines
             - Keep responses brief and conversational (1-3 sentences when possible)
@@ -893,6 +940,9 @@ final class RealtimeAPIClient: ObservableObject {
             - Be natural, helpful, and context-aware
             - When describing what the user sees, be specific and helpful
             """
+        
+        // Append user memories and additional instructions from settings
+        let systemInstructions = baseInstructions + SettingsManager.shared.generateInstructionsAddendum()
         
         let takePhotoTool: [String: Any] = [
             "type": "function",
@@ -902,6 +952,26 @@ final class RealtimeAPIClient: ObservableObject {
                 "type": "object",
                 "properties": [:] as [String: Any],
                 "required": [] as [String]
+            ] as [String: Any]
+        ]
+        
+        let manageMemoryTool: [String: Any] = [
+            "type": "function",
+            "name": "manage_memory",
+            "description": "Store or update a memory about the user. Use when user shares personal info, preferences, or asks to remember something. Pass empty value to delete a memory.",
+            "parameters": [
+                "type": "object",
+                "properties": [
+                    "key": [
+                        "type": "string",
+                        "description": "Memory identifier in snake_case (e.g. 'user_name', 'preferred_language', 'favorite_food')"
+                    ] as [String: Any],
+                    "value": [
+                        "type": "string",
+                        "description": "Value to store. Pass empty string to delete the memory."
+                    ] as [String: Any]
+                ] as [String: Any],
+                "required": ["key", "value"]
             ] as [String: Any]
         ]
         
@@ -923,7 +993,7 @@ final class RealtimeAPIClient: ObservableObject {
                     "silence_duration_ms": 2000,
                     "create_response": false
                 ] as [String: Any],
-                "tools": [takePhotoTool]
+                "tools": [takePhotoTool, manageMemoryTool]
             ] as [String: Any]
         ]
         

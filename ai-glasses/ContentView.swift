@@ -16,11 +16,13 @@ private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "ai-glass
 enum AppTab: Int {
     case voiceAgent = 0
     case glasses = 1
+    case settings = 2
     
     var name: String {
         switch self {
         case .voiceAgent: return "Voice Agent"
         case .glasses: return "Glasses"
+        case .settings: return "Settings"
         }
     }
 }
@@ -59,6 +61,12 @@ struct ContentView: View {
                             Label("Glasses", systemImage: "eyeglasses")
                         }
                         .tag(AppTab.glasses)
+                    
+                    SettingsView()
+                        .tabItem {
+                            Label("Settings", systemImage: "gearshape")
+                        }
+                        .tag(AppTab.settings)
                 }
                 .onChange(of: selectedTab) { oldValue, newValue in
                     logger.info("📑 Tab changed: \(oldValue.name) → \(newValue.name)")

@@ -22,7 +22,7 @@ iOS app for experimenting with Meta Ray-Ban smart glasses.
 
 ### Glasses Tab
 - `GlassesManager` - singleton for glasses connection and streaming
-- `ContentView` - TabView with Glasses and Voice Agent tabs
+- `ContentView` - TabView with Voice Agent, Glasses, and Settings tabs
 - `AudioManager` - Bluetooth HFP audio session for glasses mic
 - `VideoRecorder` - records video frames with audio to file
 
@@ -31,9 +31,16 @@ iOS app for experimenting with Meta Ray-Ban smart glasses.
 - `VoiceAgentView` - UI for voice conversations with OpenAI
 - `Config` - API keys (copy `Config.swift.example` → `Config.swift`)
 
+### Settings Tab
+- `SettingsManager` - singleton for settings persistence to Documents/settings.json
+- `SettingsView` - UI for editing user prompt and memories
+- User prompt: additional instructions appended to system prompt
+- Memories: key-value pairs the AI can read and manage
+
 ### Voice Agent Features
 - Server VAD + LLM intent classifier (gpt-4o-mini) decides when to respond
 - Tool: `take_photo` - AI can capture photos from glasses during conversation
+- Tool: `manage_memory` - AI can store/update/delete memories about the user
 - Barge-in: user can interrupt AI while speaking
 
 ### Audio
