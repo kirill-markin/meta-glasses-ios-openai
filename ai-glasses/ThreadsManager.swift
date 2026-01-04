@@ -212,6 +212,16 @@ final class ThreadsManager: ObservableObject {
         logger.info("📝 Updated thread title to: \(cleanTitle)")
     }
     
+    /// Regenerate titles for all threads with messages
+    func regenerateAllTitles() async -> Int {
+        var count = 0
+        for thread in threads where !thread.messages.isEmpty {
+            await generateAndUpdateThreadTitle(threadId: thread.id, messages: thread.messages)
+            count += 1
+        }
+        return count
+    }
+    
     /// Call fast model (Constants.fastModel) for quick text generation
     private func callGPT4oMini(prompt: String) async -> String? {
         let url = URL(string: Constants.openAIChatCompletionsURL)!

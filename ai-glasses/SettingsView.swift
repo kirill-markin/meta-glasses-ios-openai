@@ -61,6 +61,9 @@ private struct CustomTextView: UIViewRepresentable {
 
 struct SettingsView: View {
     @ObservedObject var glassesManager: GlassesManager
+    @State private var isRegeneratingTitles: Bool = false
+    @State private var showingRegenerateResult: Bool = false
+    @State private var regeneratedCount: Int = 0
     
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—"
@@ -96,6 +99,29 @@ struct SettingsView: View {
                     Text("AI")
                 }
                 
+                // Threads Section
+                Section {
+                    Button {
+                        Task {
+                            isRegeneratingTitles = true
+                            regeneratedCount = await ThreadsManager.shared.regenerateAllTitles()
+                            isRegeneratingTitles = false
+                            showingRegenerateResult = true
+                        }
+                    } label: {
+                        HStack {
+                            Label("Regenerate All Titles", systemImage: "arrow.triangle.2.circlepath")
+                            Spacer()
+                            if isRegeneratingTitles {
+                                ProgressView()
+                            }
+                        }
+                    }
+                    .disabled(isRegeneratingTitles)
+                } header: {
+                    Text("Threads")
+                }
+                
                 // Hardware Section
                 Section {
                     NavigationLink {
@@ -126,6 +152,11 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+            .alert("Titles Regenerated", isPresented: $showingRegenerateResult) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text("Updated \(regeneratedCount) thread titles.")
+            }
         }
     }
 }
