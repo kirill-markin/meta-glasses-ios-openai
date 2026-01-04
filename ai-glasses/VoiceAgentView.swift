@@ -27,15 +27,14 @@ struct VoiceAgentView: View {
     var body: some View {
         NavigationStack {
             Group {
-                // Check microphone permission first
-                switch permissionsManager.microphoneStatus {
+                // Check Bluetooth permission first (required for glasses connection)
+                switch permissionsManager.bluetoothStatus {
                 case .notDetermined:
-                    // Pre-permission priming screen
-                    MicrophonePermissionView(
+                    BluetoothPermissionView(
                         state: .priming,
                         onRequestPermission: {
-                            logger.info("🎤 Requesting microphone permission")
-                            permissionsManager.requestMicrophone()
+                            logger.info("📶 Requesting Bluetooth permission")
+                            permissionsManager.requestBluetooth()
                         },
                         onOpenSettings: {
                             permissionsManager.openAppSettings()
@@ -43,46 +42,75 @@ struct VoiceAgentView: View {
                     )
                     
                 case .denied, .restricted:
-                    // Permission denied screen
-                    MicrophonePermissionView(
+                    BluetoothPermissionView(
                         state: .denied,
                         onRequestPermission: {
-                            permissionsManager.requestMicrophone()
+                            permissionsManager.requestBluetooth()
                         },
                         onOpenSettings: {
-                            logger.info("⚙️ Opening app settings for microphone")
+                            logger.info("⚙️ Opening app settings for Bluetooth")
                             permissionsManager.openAppSettings()
                         }
                     )
                     
                 case .authorized, .limited:
-                    // Normal flow - microphone available
-                    if client.connectionState == .connected {
-                        // Connected state: show conversation UI
-                        ConnectedView(
-                            client: client,
-                            onDisconnect: {
-                                logger.info("🔌 Disconnect button tapped")
-                                client.disconnect()
+                    // Bluetooth OK - now check microphone permission
+                    switch permissionsManager.microphoneStatus {
+                    case .notDetermined:
+                        // Pre-permission priming screen
+                        MicrophonePermissionView(
+                            state: .priming,
+                            onRequestPermission: {
+                                logger.info("🎤 Requesting microphone permission")
+                                permissionsManager.requestMicrophone()
                             },
-                            onToggleMute: {
-                                logger.info("🎤 Toggle mute tapped")
-                                client.toggleMute()
-                            },
-                            onForceResponse: {
-                                logger.info("🔘 Force response tapped")
-                                client.forceResponse()
+                            onOpenSettings: {
+                                permissionsManager.openAppSettings()
                             }
                         )
-                    } else {
-                        // Disconnected/connecting/error state: show welcome screen
-                        WelcomeView(
-                            connectionState: client.connectionState,
-                            onConnect: {
-                                logger.info("🔌 Connect button tapped")
-                                client.connect()
+                        
+                    case .denied, .restricted:
+                        // Permission denied screen
+                        MicrophonePermissionView(
+                            state: .denied,
+                            onRequestPermission: {
+                                permissionsManager.requestMicrophone()
+                            },
+                            onOpenSettings: {
+                                logger.info("⚙️ Opening app settings for microphone")
+                                permissionsManager.openAppSettings()
                             }
                         )
+                        
+                    case .authorized, .limited:
+                        // Normal flow - both Bluetooth and microphone available
+                        if client.connectionState == .connected {
+                            // Connected state: show conversation UI
+                            ConnectedView(
+                                client: client,
+                                onDisconnect: {
+                                    logger.info("🔌 Disconnect button tapped")
+                                    client.disconnect()
+                                },
+                                onToggleMute: {
+                                    logger.info("🎤 Toggle mute tapped")
+                                    client.toggleMute()
+                                },
+                                onForceResponse: {
+                                    logger.info("🔘 Force response tapped")
+                                    client.forceResponse()
+                                }
+                            )
+                        } else {
+                            // Disconnected/connecting/error state: show welcome screen
+                            WelcomeView(
+                                connectionState: client.connectionState,
+                                onConnect: {
+                                    logger.info("🔌 Connect button tapped")
+                                    client.connect()
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -95,6 +123,13 @@ struct VoiceAgentView: View {
             }
             .onDisappear {
                 logger.info("📱 Voice Agent tab disappeared")
+            }
+            .onChange(of: permissionsManager.bluetoothStatus) { oldValue, newValue in
+                // When Bluetooth permission changes to authorized, check for pending continuation
+                if newValue == .authorized && oldValue != .authorized {
+                    logger.info("📶 Bluetooth permission granted")
+                    checkPendingContinuation()
+                }
             }
             .onChange(of: permissionsManager.microphoneStatus) { oldValue, newValue in
                 // When permission changes to authorized, check for pending thread continuation
@@ -109,6 +144,12 @@ struct VoiceAgentView: View {
     /// Check if there's a pending thread continuation and auto-connect
     private func checkPendingContinuation() {
         guard let threadId = threadsManager.pendingContinuationThreadId else { return }
+        
+        // Don't auto-connect if Bluetooth not authorized - let user see permission screen first
+        guard permissionsManager.bluetoothStatus == .authorized else {
+            logger.info("⏸️ Pending thread continuation waiting for Bluetooth permission")
+            return
+        }
         
         // Don't auto-connect if microphone not authorized - let user see permission screen first
         guard permissionsManager.microphoneStatus == .authorized else {
@@ -551,15 +592,111 @@ private struct MuteButton: View {
     }
 }
 
-// MARK: - Microphone Permission View
+// MARK: - Permission State
 
-enum MicrophonePermissionState {
+enum PermissionPrimingState {
     case priming      // Before first system request
     case denied       // User denied permission
 }
 
+// MARK: - Bluetooth Permission View
+
+private struct BluetoothPermissionView: View {
+    let state: PermissionPrimingState
+    let onRequestPermission: () -> Void
+    let onOpenSettings: () -> Void
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            Spacer()
+            
+            VStack(spacing: 32) {
+                // Icon
+                ZStack {
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: state == .priming
+                                    ? [Color.blue.opacity(0.2), Color.cyan.opacity(0.2)]
+                                    : [Color.orange.opacity(0.2), Color.red.opacity(0.2)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 120, height: 120)
+                    
+                    Image(systemName: state == .priming ? "antenna.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right.slash")
+                        .font(.system(size: 56))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: state == .priming ? [.blue, .cyan] : [.orange, .red],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                }
+                
+                // Text
+                VStack(spacing: 12) {
+                    Text(state == .priming ? "Bluetooth Access Required" : "Bluetooth Access Denied")
+                        .font(.title.bold())
+                        .multilineTextAlignment(.center)
+                    
+                    Text(state == .priming
+                         ? "Voice Agent needs Bluetooth to connect to your Meta Ray-Ban glasses.\nWithout Bluetooth, the app cannot communicate with your glasses."
+                         : "You've previously denied Bluetooth access.\nTo use Voice Agent with glasses, please enable it in Settings.")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 32)
+                }
+                
+                // Action button
+                VStack(spacing: 16) {
+                    if state == .priming {
+                        Button(action: onRequestPermission) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "antenna.radiowaves.left.and.right")
+                                Text("Allow Bluetooth")
+                            }
+                            .font(.headline)
+                            .frame(maxWidth: 240)
+                            .padding(.vertical, 16)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.blue)
+                    } else {
+                        Button(action: onOpenSettings) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "gear")
+                                Text("Open Settings")
+                            }
+                            .font(.headline)
+                            .frame(maxWidth: 240)
+                            .padding(.vertical, 16)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.orange)
+                        
+                        Text("After enabling, return to the app")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            }
+            
+            Spacer()
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.systemBackground))
+    }
+}
+
+// MARK: - Microphone Permission View
+
 private struct MicrophonePermissionView: View {
-    let state: MicrophonePermissionState
+    let state: PermissionPrimingState
     let onRequestPermission: () -> Void
     let onOpenSettings: () -> Void
     
