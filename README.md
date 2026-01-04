@@ -16,6 +16,20 @@ Talk hands-free through your glasses. The AI hears you, sees what you see, and r
 - 🌐 `search_internet` — real-time news, weather, prices, sports scores (via Perplexity)
 - 🧠 `manage_memory` — remember things about you across conversations
 
+## Before You Start
+
+> ⚠️ **Developer Mode Required**  
+> Your Meta glasses must have **Developer Mode enabled** before this app can connect to them.  
+> Without this, the app will build successfully but won't see your glasses.
+>
+> **How to enable:**  
+> 1. Open **Meta AI** app on your phone  
+> 2. Go to **Settings** → **Glasses** → scroll down  
+> 3. Enable **Developer Mode**  
+> 4. Follow prompts to restart glasses if needed
+>
+> See [Meta Wearables Setup Guide](https://wearables.developer.meta.com/docs/getting-started-toolkit) for detailed instructions.
+
 ## Quick Start
 
 ### 1. Clone and configure
@@ -69,7 +83,7 @@ Open `meta-glasses-ios-openai.xcodeproj` in Xcode → Run on physical iOS device
 | OpenAI API key | [platform.openai.com/api-keys](https://platform.openai.com/api-keys) |
 | Perplexity API key | [perplexity.ai/settings/api](https://www.perplexity.ai/settings/api) |
 
-> ⚠️ **Important:** Enable **Developer Mode** on your glasses before using the app. See [Meta Wearables Setup Guide](https://wearables.developer.meta.com/docs/getting-started-toolkit) for instructions.
+> 💡 Don't forget to enable Developer Mode on your glasses — see [Before You Start](#before-you-start) above.
 
 ## Tech Stack
 
