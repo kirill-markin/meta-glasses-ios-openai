@@ -1,6 +1,6 @@
 # Meta Glasses iOS OpenAI
 
-![Meta Glasses AI Screenshots](docs/screenshots.png)
+![Meta Glasses AI Screenshots](docs/screenshots.jpg)
 
 Voice AI assistant for **Meta smart glasses** powered by **OpenAI Realtime API**.
 
