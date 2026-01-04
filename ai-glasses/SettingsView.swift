@@ -15,6 +15,7 @@ struct SettingsView: View {
     @State private var userPrompt: String = ""
     @State private var selectedMemoryKey: String?
     @State private var showingMemoryEditor = false
+    @FocusState private var isUserPromptFocused: Bool
     
     var body: some View {
         NavigationStack {
@@ -23,6 +24,7 @@ struct SettingsView: View {
                 Section {
                     TextEditor(text: $userPrompt)
                         .frame(minHeight: 120)
+                        .focused($isUserPromptFocused)
                         .onChange(of: userPrompt) { _, newValue in
                             settingsManager.userPrompt = newValue
                         }
@@ -81,7 +83,16 @@ struct SettingsView: View {
                     Text("Info")
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle("Settings")
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        isUserPromptFocused = false
+                    }
+                }
+            }
             .onAppear {
                 userPrompt = settingsManager.userPrompt
             }
@@ -168,6 +179,12 @@ private struct MemoryEditorView: View {
     
     @State private var key: String = ""
     @State private var value: String = ""
+    @FocusState private var focusedField: Field?
+    
+    private enum Field {
+        case key
+        case value
+    }
     
     var body: some View {
         NavigationStack {
@@ -176,6 +193,7 @@ private struct MemoryEditorView: View {
                     TextField("Key", text: $key)
                         .autocapitalization(.none)
                         .autocorrectionDisabled()
+                        .focused($focusedField, equals: .key)
                 } header: {
                     Text("Key")
                 } footer: {
@@ -185,12 +203,14 @@ private struct MemoryEditorView: View {
                 Section {
                     TextEditor(text: $value)
                         .frame(minHeight: 100)
+                        .focused($focusedField, equals: .value)
                 } header: {
                     Text("Value")
                 } footer: {
                     Text("The information to remember")
                 }
             }
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle(originalKey.starts(with: "new_memory") ? "New Memory" : "Edit Memory")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -203,6 +223,13 @@ private struct MemoryEditorView: View {
                         onSave(key, value)
                     }
                     .disabled(key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+                
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        focusedField = nil
+                    }
                 }
             }
             .onAppear {
