@@ -53,6 +53,16 @@
 		</dict>
 	</array>
 	
+	<!-- Lock to portrait orientation only -->
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	<key>UISupportedInterfaceOrientations~ipad</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
+	
 	<!-- Wearables Device Access Toolkit configuration -->
 	<key>MWDAT</key>
 	<dict>
