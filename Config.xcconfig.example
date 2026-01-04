@@ -2,22 +2,50 @@
 // Copy this file to Config.xcconfig and fill in your values
 //
 // IMPORTANT: Config.xcconfig is gitignored - your values stay private
-//
-// These values are used throughout the project:
-// - PRODUCT_BUNDLE_IDENTIFIER: App bundle ID for iOS
-// - DEVELOPMENT_TEAM: Your Apple Developer Team ID for code signing
-// - META_APP_ID: Used in Info.plist for Meta Wearables SDK
-// - APP_LINK_URL_SCHEME: URL scheme for Meta AI app callbacks
 
-// Your Bundle Identifier (register at https://developer.apple.com)
+// ============================================================================
+// PRODUCT_BUNDLE_IDENTIFIER
+// ============================================================================
+// Your unique app identifier in reverse-DNS format
+// Example: com.johndoe.metaglasses
+//
 PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.metaglasses
 
-// Your Apple Developer Team ID (find at https://developer.apple.com/account)
-DEVELOPMENT_TEAM = YOUR_TEAM_ID_HERE
+// ============================================================================
+// DEVELOPMENT_TEAM
+// ============================================================================
+// ⚠️  This is a 10-character alphanumeric ID, NOT your team name!
+//
+// Format: ABC123XYZ0 (10 chars, letters and numbers)
+// 
+// Where to find:
+//   - Xcode: Settings → Accounts → Select your team → Team ID
+//   - Web: https://developer.apple.com/account → Membership → Team ID
+//
+// Common mistake: Using "My Company LLC" instead of "ABC123XYZ0"
+//
+DEVELOPMENT_TEAM = XXXXXXXXXX
 
-// Your Meta App ID (register at https://developer.meta.com)
-// This is used for Meta Wearables Device Access Toolkit
-META_APP_ID = YOUR_META_APP_ID_HERE
+// ============================================================================
+// META_APP_ID
+// ============================================================================
+// Your Meta App ID (numeric) for Wearables SDK
+//
+// Where to find:
+//   1. Go to https://developer.meta.com/apps
+//   2. Select your app (or create one)
+//   3. Dashboard → Settings → Basic → App ID (at the top)
+//
+// ⚠️  This is the numeric App ID, not App Secret or Client Token
+//
+META_APP_ID = 0000000000000000
 
-// Your App Link URL Scheme (should match bundle identifier pattern)
+// ============================================================================
+// APP_LINK_URL_SCHEME
+// ============================================================================
+// URL scheme for Meta AI app callbacks after registration
+//
+// ⚠️  MUST exactly match PRODUCT_BUNDLE_IDENTIFIER above!
+//     Otherwise Meta AI app can't return control to this app.
+//
 APP_LINK_URL_SCHEME = com.yourcompany.metaglasses
