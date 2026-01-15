@@ -34,6 +34,13 @@ final class SoundManager {
         playTone(frequencies: [660], duration: 0.1, pause: 0)
     }
     
+    /// Play sound when Voice Agent session ends
+    /// Short descending two-tone chime (ending/goodbye feeling)
+    func playDisconnectSound() {
+        logger.info("🔔 Playing disconnect sound")
+        playTone(frequencies: [1320, 880], duration: 0.08, pause: 0.05)
+    }
+    
     /// Generate and play a sequence of sine wave tones
     private func playTone(frequencies: [Double], duration: Double, pause: Double) {
         let sampleRate: Double = 44100

@@ -49,6 +49,7 @@ struct ContentView: View {
     @StateObject private var glassesManager = GlassesManager()
     @ObservedObject private var permissionsManager = PermissionsManager.shared
     @ObservedObject private var settingsManager = SettingsManager.shared
+    @ObservedObject private var voiceTrigger = VoiceAgentTrigger.shared
     
     var body: some View {
         Group {
@@ -82,6 +83,13 @@ struct ContentView: View {
                 }
                 .onChange(of: selectedTab) { oldValue, newValue in
                     logger.info("📑 Tab changed: \(oldValue.name) → \(newValue.name)")
+                }
+                .onChange(of: voiceTrigger.shouldStartVoiceAgent) { oldValue, newValue in
+                    // Handle Siri trigger: switch to Voice Agent tab
+                    if newValue && !oldValue {
+                        logger.info("🎙️ Siri triggered Voice Agent - switching to Voice Agent tab")
+                        selectedTab = .voiceAgent
+                    }
                 }
             } else {
                 LoadingView()

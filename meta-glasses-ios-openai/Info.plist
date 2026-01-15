@@ -2,6 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<!-- App display name (used by Siri and on home screen) -->
+	<key>CFBundleDisplayName</key>
+	<string>Glasses</string>
+	
 	<!-- Bluetooth permission for glasses connection -->
 	<key>NSBluetoothAlwaysUsageDescription</key>
 	<string>Bluetooth is required to connect to your Meta Glasses. Without Bluetooth access, this app cannot function.</string>

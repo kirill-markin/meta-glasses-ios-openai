@@ -34,6 +34,7 @@ struct VoiceAgentView: View {
     @ObservedObject private var threadsManager = ThreadsManager.shared
     @ObservedObject private var permissionsManager = PermissionsManager.shared
     @ObservedObject private var settingsManager = SettingsManager.shared
+    @ObservedObject private var voiceTrigger = VoiceAgentTrigger.shared
     
     init(glassesManager: GlassesManager) {
         self.glassesManager = glassesManager
@@ -144,6 +145,7 @@ struct VoiceAgentView: View {
                 // Refresh permission status (user may have changed it in Settings)
                 permissionsManager.refreshAll()
                 checkPendingContinuation()
+                checkSiriTrigger()
             }
             .onDisappear {
                 logger.info("📱 Voice Agent tab disappeared")
@@ -160,9 +162,50 @@ struct VoiceAgentView: View {
                 if newValue == .authorized && oldValue != .authorized {
                     logger.info("🎤 Microphone permission granted")
                     checkPendingContinuation()
+                    checkSiriTrigger()
+                }
+            }
+            .onChange(of: voiceTrigger.shouldStartVoiceAgent) { oldValue, newValue in
+                // Handle Siri trigger to auto-start voice agent
+                if newValue && !oldValue {
+                    logger.info("🎙️ Siri trigger detected in VoiceAgentView")
+                    checkSiriTrigger()
                 }
             }
         }
+    }
+    
+    /// Check if Siri triggered voice agent start and handle auto-connect
+    private func checkSiriTrigger() {
+        guard voiceTrigger.shouldStartVoiceAgent else { return }
+        
+        // Check all requirements
+        guard permissionsManager.bluetoothStatus == .authorized else {
+            logger.info("⏸️ Siri trigger waiting for Bluetooth permission")
+            return
+        }
+        
+        guard permissionsManager.microphoneStatus == .authorized else {
+            logger.info("⏸️ Siri trigger waiting for microphone permission")
+            return
+        }
+        
+        guard settingsManager.isOpenAIConfigured else {
+            logger.info("⏸️ Siri trigger waiting for OpenAI API key")
+            voiceTrigger.reset()
+            return
+        }
+        
+        guard client.connectionState == .disconnected else {
+            logger.info("⏸️ Siri trigger ignored - already connected or connecting")
+            voiceTrigger.reset()
+            return
+        }
+        
+        // All requirements met - start voice agent
+        logger.info("🎙️ Siri trigger: starting voice agent")
+        voiceTrigger.reset()
+        client.connect()
     }
     
     /// Check if there's a pending thread continuation and auto-connect

@@ -7,6 +7,7 @@
 
 import SwiftUI
 import MWDATCore
+import AppIntents
 import os.log
 
 private let logger = Logger(subsystem: Bundle.main.bundleIdentifier ?? "meta-glasses-ios-openai", category: "App")
@@ -23,6 +24,10 @@ struct MetaGlassesApp: App {
             logger.error("❌ Failed to configure Wearables SDK: \(error.localizedDescription)")
             fatalError("Failed to configure Wearables SDK: \(error)")
         }
+        
+        // Register Siri Shortcuts for voice activation
+        MetaGlassesShortcuts.updateAppShortcutParameters()
+        logger.info("✅ Siri Shortcuts registered")
     }
     
     var body: some Scene {
