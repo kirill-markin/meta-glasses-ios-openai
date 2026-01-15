@@ -111,6 +111,19 @@ meta-glasses-ios-openai/
 └── AudioManager.swift      # Bluetooth HFP audio
 ```
 
+## Siri Voice Activation
+
+You can start the voice assistant hands-free using Siri:
+
+| Action | What to say |
+|--------|-------------|
+| **Start session** | "Hey Siri, start session with Glasses" |
+| **Stop session** | "Stop session" *(said to the AI, not Siri)* |
+
+**Limitation:** "Hey Siri" is heard by your iPhone, not the glasses. If your phone is too far away or in a bag, Siri won't hear you. The glasses microphone cannot trigger Siri — this is an iOS limitation.
+
+*Future: When Meta enables custom button actions on glasses, this can be improved.*
+
 ## License
 
 [MIT](LICENSE)

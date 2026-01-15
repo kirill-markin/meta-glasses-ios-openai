@@ -404,6 +404,9 @@ final class RealtimeAPIClient: ObservableObject {
     func disconnect() {
         logger.info("Disconnecting from Realtime API")
         
+        // Play disconnect sound
+        SoundManager.shared.playDisconnectSound()
+        
         // Save messages to thread before clearing
         ThreadsManager.shared.saveMessages(messages: messages)
         ThreadsManager.shared.finalizeActiveThread()
@@ -1470,6 +1473,15 @@ final class RealtimeAPIClient: ObservableObject {
                     ThreadsManager.shared.saveMessages(messages: messages)
                 }
                 logger.info("👤 User: \(transcript)")
+                
+                // Check for stop phrases to end the conversation (case-insensitive)
+                let stopPhrases = ["Stop session"]
+                let lowerTranscript = transcript.lowercased()
+                if stopPhrases.contains(where: { lowerTranscript.contains($0.lowercased()) }) {
+                    logger.info("🛑 Stop phrase detected - disconnecting")
+                    disconnect()
+                    return
+                }
                 
                 // Add to recent transcripts for context
                 recentTranscripts.append(transcript)
